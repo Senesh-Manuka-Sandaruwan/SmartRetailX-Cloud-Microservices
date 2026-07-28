@@ -5,6 +5,9 @@ from app.models.user import User
 from app.schemas.user_schema import UserCreate
 from app.core.security import hash_password
 
+from app.core.security import verify_password
+from app.core.token import create_access_token
+
 
 def create_user(db: Session, user: UserCreate):
 
@@ -37,4 +40,32 @@ def create_user(db: Session, user: UserCreate):
             "email": db_user.email,
             "role": db_user.role
         }
+    }
+
+def login_user(db: Session, email: str, password: str):
+
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    if not verify_password(password, user.password):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    token = create_access_token(
+        {
+            "sub": user.email,
+            "role": user.role
+        }
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
     }
