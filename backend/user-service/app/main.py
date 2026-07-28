@@ -32,5 +32,7 @@ def health():
 
 from app.models.user import User
 from app.database.database import Base, engine
-
 Base.metadata.create_all(bind=engine)
+
+from app.routers.user_router import router as user_router
+app.include_router(user_router)
