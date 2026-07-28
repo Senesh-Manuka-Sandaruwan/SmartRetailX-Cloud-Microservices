@@ -10,6 +10,8 @@ from app.services.user_service import login_user
 
 from app.core.auth import get_current_user
 
+from app.core.roles import require_role
+
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
@@ -34,5 +36,15 @@ def get_profile(current_user=Depends(get_current_user)):
 
     return {
         "message": "Access Granted",
+        "user": current_user
+    }
+
+@router.get("/admin")
+def admin_dashboard(
+    current_user=Depends(require_role("admin"))
+):
+
+    return {
+        "message": "Welcome Admin",
         "user": current_user
     }
