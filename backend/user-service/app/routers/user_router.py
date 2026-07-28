@@ -8,6 +8,8 @@ from app.services.user_service import create_user
 from app.schemas.user_schema import UserLogin
 from app.services.user_service import login_user
 
+from app.core.auth import get_current_user
+
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
@@ -26,3 +28,11 @@ def login(
         user.email,
         user.password
     )
+
+@router.get("/profile")
+def get_profile(current_user=Depends(get_current_user)):
+
+    return {
+        "message": "Access Granted",
+        "user": current_user
+    }
