@@ -2,39 +2,46 @@ import os
 from typing import Optional
 
 import requests
+from dotenv import load_dotenv
 from fastapi import HTTPException
-from requests import Response
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.order import Order
-from app.schemas.order_schema import OrderCreate, OrderStatusUpdate
+from app.schemas.order_schema import (
+    OrderCreate,
+    OrderStatusUpdate
+)
 
 
-# =========================================================
-# PRODUCT SERVICE CONFIGURATION
-# =========================================================
+load_dotenv()
+
+
+# ==========================================================
+# SERVICE CONFIGURATION
+# ==========================================================
 
 PRODUCT_SERVICE_URL = os.getenv(
     "PRODUCT_SERVICE_URL",
     "http://127.0.0.1:8001"
 ).rstrip("/")
 
-# The Product Service protects PUT /products/{id} with require_admin.
-# Therefore, an admin/service JWT can be placed in the Order Service
-# .env file as PRODUCT_SERVICE_TOKEN.
 PRODUCT_SERVICE_TOKEN = os.getenv(
     "PRODUCT_SERVICE_TOKEN",
     ""
 )
 
-REQUEST_TIMEOUT = 10
+NOTIFICATION_SERVICE_URL = os.getenv(
+    "NOTIFICATION_SERVICE_URL",
+    "http://127.0.0.1:8003"
+).rstrip("/")
 
+NOTIFICATION_SERVICE_TOKEN = os.getenv(
+    "NOTIFICATION_SERVICE_TOKEN",
+    ""
+)
 
-# =========================================================
-# ALLOWED ORDER STATUSES
-# =========================================================
 
 ALLOWED_ORDER_STATUSES = [
     "Pending",
@@ -46,88 +53,54 @@ ALLOWED_ORDER_STATUSES = [
 ]
 
 
-# =========================================================
-# PRODUCT SERVICE REQUEST HELPERS
-# =========================================================
+# ==========================================================
+# SERVICE AUTHORIZATION HEADERS
+# ==========================================================
 
-def _get_product_service_headers() -> dict:
+def build_authorization_headers(token: str) -> dict:
     """
-    Create headers for protected Product Service requests.
-
-    PRODUCT_SERVICE_TOKEN should contain a valid admin/service JWT.
+    Create an Authorization header for service-to-service requests.
     """
 
-    headers = {
-        "Content-Type": "application/json"
+    if not token:
+        return {}
+
+    cleaned_token = token.strip()
+
+    if cleaned_token.lower().startswith("bearer "):
+        return {
+            "Authorization": cleaned_token
+        }
+
+    return {
+        "Authorization": f"Bearer {cleaned_token}"
     }
 
-    if PRODUCT_SERVICE_TOKEN:
-        token = PRODUCT_SERVICE_TOKEN.strip()
 
-        if token.lower().startswith("bearer "):
-            headers["Authorization"] = token
-        else:
-            headers["Authorization"] = f"Bearer {token}"
+# ==========================================================
+# PRODUCT SERVICE HELPERS
+# ==========================================================
 
-    return headers
-
-
-def _extract_error_message(response: Response) -> str:
+def get_product_from_product_service(
+    product_id: int
+) -> dict:
     """
-    Extract a useful error message from a Product Service response.
-    """
-
-    try:
-        response_data = response.json()
-
-        if isinstance(response_data, dict):
-            detail = response_data.get("detail")
-
-            if detail:
-                return str(detail)
-
-            message = response_data.get("message")
-
-            if message:
-                return str(message)
-
-        return str(response_data)
-
-    except ValueError:
-        return response.text or "Unknown Product Service error"
-
-
-def _get_product_from_service(product_id: int) -> dict:
-    """
-    Retrieve one product from the Product Service.
+    Retrieve a product from the Product Service.
     """
 
     try:
         response = requests.get(
             f"{PRODUCT_SERVICE_URL}/products/{product_id}",
-            timeout=REQUEST_TIMEOUT
-        )
-
-    except requests.ConnectionError:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Product Service is unavailable. "
-                "Make sure it is running on "
-                f"{PRODUCT_SERVICE_URL}"
-            )
-        )
-
-    except requests.Timeout:
-        raise HTTPException(
-            status_code=504,
-            detail="Product Service request timed out"
+            timeout=10
         )
 
     except requests.RequestException as error:
         raise HTTPException(
             status_code=503,
-            detail=f"Could not communicate with Product Service: {error}"
+            detail=(
+                "Product Service is unavailable. "
+                f"Reason: {str(error)}"
+            )
         )
 
     if response.status_code == 404:
@@ -137,57 +110,134 @@ def _get_product_from_service(product_id: int) -> dict:
         )
 
     if response.status_code != 200:
-        error_message = _extract_error_message(response)
-
         raise HTTPException(
             status_code=502,
-            detail=f"Product Service error: {error_message}"
+            detail=(
+                "Unable to retrieve product information from "
+                "the Product Service"
+            )
         )
 
     try:
-        product_data = response.json()
-
+        response_data = response.json()
     except ValueError:
         raise HTTPException(
             status_code=502,
             detail="Product Service returned an invalid response"
         )
 
-    required_fields = [
-        "id",
-        "name",
-        "price",
-        "stock"
-    ]
+    # Supports either:
+    # {"id": 1, "name": "..."}
+    # or {"product": {"id": 1, "name": "..."}}
+    if isinstance(response_data, dict):
+        product = response_data.get(
+            "product",
+            response_data
+        )
+    else:
+        product = response_data
 
-    missing_fields = [
-        field
-        for field in required_fields
-        if field not in product_data
-    ]
-
-    if missing_fields:
+    if not isinstance(product, dict):
         raise HTTPException(
             status_code=502,
-            detail=(
-                "Product Service response is missing required fields: "
-                f"{', '.join(missing_fields)}"
-            )
+            detail="Invalid product information received"
         )
 
-    return product_data
+    return product
 
 
-def _update_product_stock(
-    product_id: int,
+def extract_product_stock(product: dict) -> int:
+    """
+    Extract stock using commonly used product field names.
+    """
+
+    stock = product.get("stock_quantity")
+
+    if stock is None:
+        stock = product.get("stock")
+
+    if stock is None:
+        stock = product.get("quantity")
+
+    if stock is None:
+        raise HTTPException(
+            status_code=502,
+            detail="Product stock information is missing"
+        )
+
+    try:
+        return int(stock)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=502,
+            detail="Product stock information is invalid"
+        )
+
+
+def extract_product_price(product: dict) -> float:
+    """
+    Extract and validate the product price.
+    """
+
+    price = product.get("price")
+
+    if price is None:
+        raise HTTPException(
+            status_code=502,
+            detail="Product price information is missing"
+        )
+
+    try:
+        return float(price)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=502,
+            detail="Product price information is invalid"
+        )
+
+
+def build_product_update_payload(
+    product: dict,
     new_stock: int
 ) -> dict:
     """
-    Update product stock through the Product Service.
+    Build the product update body while preserving its existing data.
+    """
 
-    Your Product Service protects PUT /products/{product_id}
-    with require_admin. PRODUCT_SERVICE_TOKEN must therefore contain
-    a valid admin or service JWT.
+    payload = {}
+
+    supported_fields = [
+        "name",
+        "description",
+        "price",
+        "category",
+        "brand",
+        "image_url",
+        "is_active"
+    ]
+
+    for field in supported_fields:
+        if field in product:
+            payload[field] = product[field]
+
+    if "stock_quantity" in product:
+        payload["stock_quantity"] = new_stock
+    elif "stock" in product:
+        payload["stock"] = new_stock
+    elif "quantity" in product:
+        payload["quantity"] = new_stock
+    else:
+        payload["stock_quantity"] = new_stock
+
+    return payload
+
+
+def update_product_stock(
+    product: dict,
+    new_stock: int
+):
+    """
+    Update product stock through the Product Service.
     """
 
     if new_stock < 0:
@@ -196,80 +246,135 @@ def _update_product_stock(
             detail="Product stock cannot be negative"
         )
 
-    if not PRODUCT_SERVICE_TOKEN:
+    product_id = product.get("id")
+
+    if not product_id:
         raise HTTPException(
-            status_code=500,
-            detail=(
-                "PRODUCT_SERVICE_TOKEN is not configured. "
-                "Add a valid admin/service JWT to the Order Service .env file "
-                "so it can update product stock."
-            )
+            status_code=502,
+            detail="Product ID is missing"
         )
+
+    payload = build_product_update_payload(
+        product=product,
+        new_stock=new_stock
+    )
+
+    headers = build_authorization_headers(
+        PRODUCT_SERVICE_TOKEN
+    )
 
     try:
         response = requests.put(
             f"{PRODUCT_SERVICE_URL}/products/{product_id}",
-            json={
-                "stock": new_stock
-            },
-            headers=_get_product_service_headers(),
-            timeout=REQUEST_TIMEOUT
-        )
-
-    except requests.ConnectionError:
-        raise HTTPException(
-            status_code=503,
-            detail="Product Service is unavailable"
-        )
-
-    except requests.Timeout:
-        raise HTTPException(
-            status_code=504,
-            detail="Product Service stock update timed out"
+            json=payload,
+            headers=headers,
+            timeout=10
         )
 
     except requests.RequestException as error:
         raise HTTPException(
             status_code=503,
-            detail=f"Could not update product stock: {error}"
+            detail=(
+                "Product Service is unavailable while updating stock. "
+                f"Reason: {str(error)}"
+            )
         )
 
     if response.status_code in (401, 403):
         raise HTTPException(
             status_code=502,
             detail=(
-                "Product Service rejected the stock update. "
-                "Check that PRODUCT_SERVICE_TOKEN contains a valid "
-                "admin/service JWT."
+                "Order Service is not authorized to update product stock. "
+                "Check PRODUCT_SERVICE_TOKEN."
             )
         )
 
-    if response.status_code == 404:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
-
     if response.status_code not in (200, 201):
-        error_message = _extract_error_message(response)
+        detail = "Unable to update product stock"
+
+        try:
+            error_body = response.json()
+
+            if isinstance(error_body, dict):
+                detail = error_body.get(
+                    "detail",
+                    detail
+                )
+        except ValueError:
+            pass
 
         raise HTTPException(
             status_code=502,
-            detail=f"Could not update product stock: {error_message}"
+            detail=detail
         )
 
+
+# ==========================================================
+# NOTIFICATION SERVICE HELPER
+# ==========================================================
+
+def send_order_notification(
+    customer_email: str,
+    order_id: int,
+    notification_type: str,
+    title: str,
+    message: str
+) -> bool:
+    """
+    Send a notification to the Notification Service.
+
+    Notification failure does not cancel a successfully completed
+    order operation. The function returns False when delivery fails.
+    """
+
+    if not NOTIFICATION_SERVICE_TOKEN:
+        print(
+            "Notification skipped: "
+            "NOTIFICATION_SERVICE_TOKEN is missing"
+        )
+        return False
+
+    notification_payload = {
+        "customer_email": customer_email,
+        "order_id": order_id,
+        "notification_type": notification_type,
+        "title": title,
+        "message": message
+    }
+
+    headers = build_authorization_headers(
+        NOTIFICATION_SERVICE_TOKEN
+    )
+
     try:
-        return response.json()
+        response = requests.post(
+            f"{NOTIFICATION_SERVICE_URL}/notifications/",
+            json=notification_payload,
+            headers=headers,
+            timeout=10
+        )
 
-    except ValueError:
-        return {
-            "message": "Product stock updated successfully"
-        }
+    except requests.RequestException as error:
+        print(
+            "Notification Service request failed: "
+            f"{str(error)}"
+        )
+        return False
+
+    if response.status_code not in (200, 201):
+        print(
+            "Notification creation failed. "
+            f"Status: {response.status_code}, "
+            f"Response: {response.text}"
+        )
+        return False
+
+    return True
 
 
-# =========================================================
+# ==========================================================
 # CREATE ORDER
-# =========================================================
+# ==========================================================
 
 def create_order(
     db: Session,
@@ -277,132 +382,109 @@ def create_order(
     customer_email: str
 ):
     """
-    Create an order.
-
-    Steps:
-    1. Validate the customer email.
-    2. Retrieve the product from Product Service.
-    3. Check available stock.
-    4. Calculate the total price.
-    5. Reduce product stock.
-    6. Save the order in the Order Service database.
+    Create an order, calculate its total price,
+    and reduce the corresponding product stock.
     """
 
-    if not customer_email:
+    cleaned_email = customer_email.strip()
+
+    if not cleaned_email:
         raise HTTPException(
             status_code=401,
             detail="Authenticated customer email is required"
         )
 
-    product = _get_product_from_service(
+    product = get_product_from_product_service(
         order_data.product_id
     )
 
-    try:
-        product_stock = int(product["stock"])
-        product_price = float(product["price"])
+    available_stock = extract_product_stock(product)
+    unit_price = extract_product_price(product)
 
-    except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=502,
-            detail="Product Service returned invalid price or stock data"
-        )
+    product_name = (
+        product.get("name")
+        or product.get("product_name")
+        or f"Product {order_data.product_id}"
+    )
 
-    if product_stock < order_data.quantity:
+    if order_data.quantity > available_stock:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Insufficient product stock. "
-                f"Available stock: {product_stock}"
+                f"Insufficient stock. "
+                f"Available quantity: {available_stock}"
             )
         )
 
-    new_stock = product_stock - order_data.quantity
-
-    unit_price = round(product_price, 2)
-
-    total_price = round(
-        unit_price * order_data.quantity,
-        2
-    )
+    new_stock = available_stock - order_data.quantity
+    total_price = unit_price * order_data.quantity
 
     new_order = Order(
-        customer_email=customer_email,
-        product_id=product["id"],
-        product_name=product["name"],
+        customer_email=cleaned_email,
+        product_id=order_data.product_id,
+        product_name=product_name,
         quantity=order_data.quantity,
         unit_price=unit_price,
         total_price=total_price,
         status="Pending"
     )
 
-    stock_reduced = False
+    # Update stock before storing the order.
+    update_product_stock(
+        product=product,
+        new_stock=new_stock
+    )
 
     try:
-        # Reserve/reduce stock in the Product Service.
-        _update_product_stock(
-            product_id=product["id"],
-            new_stock=new_stock
-        )
-
-        stock_reduced = True
-
         db.add(new_order)
         db.commit()
         db.refresh(new_order)
 
-        return {
-            "message": "Order created successfully",
-            "order": new_order
-        }
-
-    except HTTPException:
-        db.rollback()
-        raise
-
     except SQLAlchemyError:
         db.rollback()
 
-        # Compensating action: restore stock when database saving fails.
-        if stock_reduced:
-            try:
-                _update_product_stock(
-                    product_id=product["id"],
-                    new_stock=product_stock
-                )
-            except HTTPException:
-                pass
+        # Compensation: restore stock if order storage fails.
+        try:
+            update_product_stock(
+                product=product,
+                new_stock=available_stock
+            )
+        except HTTPException:
+            print(
+                "Critical warning: order creation failed and "
+                "product stock could not be restored automatically"
+            )
 
         raise HTTPException(
             status_code=500,
             detail="Database error occurred while creating the order"
         )
 
-    except Exception as error:
-        db.rollback()
-
-        if stock_reduced:
-            try:
-                _update_product_stock(
-                    product_id=product["id"],
-                    new_stock=product_stock
-                )
-            except HTTPException:
-                pass
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not create order: {error}"
+    notification_created = send_order_notification(
+        customer_email=new_order.customer_email,
+        order_id=new_order.id,
+        notification_type="ORDER_CREATED",
+        title="Order Created",
+        message=(
+            f"Your order number {new_order.id} for "
+            f"{new_order.product_name} has been created successfully."
         )
+    )
+
+    return {
+        "message": "Order created successfully",
+        "notification_created": notification_created,
+        "order": new_order
+    }
 
 
-# =========================================================
+# ==========================================================
 # GET ALL ORDERS
-# =========================================================
+# ==========================================================
 
 def get_all_orders(db: Session):
     """
-    Return all orders, with the newest orders first.
+    Return all orders, newest first.
     """
 
     return (
@@ -412,19 +494,21 @@ def get_all_orders(db: Session):
     )
 
 
-# =========================================================
-# GET CURRENT CUSTOMER'S ORDERS
-# =========================================================
+# ==========================================================
+# GET CUSTOMER ORDERS
+# ==========================================================
 
 def get_customer_orders(
     db: Session,
     customer_email: str
 ):
     """
-    Return orders belonging to the authenticated customer.
+    Return all orders belonging to one customer.
     """
 
-    if not customer_email:
+    cleaned_email = customer_email.strip()
+
+    if not cleaned_email:
         raise HTTPException(
             status_code=401,
             detail="Authenticated customer email is required"
@@ -432,15 +516,15 @@ def get_customer_orders(
 
     return (
         db.query(Order)
-        .filter(Order.customer_email == customer_email)
+        .filter(Order.customer_email == cleaned_email)
         .order_by(Order.created_at.desc())
         .all()
     )
 
 
-# =========================================================
+# ==========================================================
 # GET ORDER BY ID
-# =========================================================
+# ==========================================================
 
 def get_order_by_id(
     db: Session,
@@ -465,9 +549,9 @@ def get_order_by_id(
     return order
 
 
-# =========================================================
+# ==========================================================
 # GET CUSTOMER ORDER BY ID
-# =========================================================
+# ==========================================================
 
 def get_customer_order_by_id(
     db: Session,
@@ -475,10 +559,12 @@ def get_customer_order_by_id(
     customer_email: str
 ):
     """
-    Return one order only when it belongs to the authenticated customer.
+    Return an order only when it belongs to the customer.
     """
 
-    if not customer_email:
+    cleaned_email = customer_email.strip()
+
+    if not cleaned_email:
         raise HTTPException(
             status_code=401,
             detail="Authenticated customer email is required"
@@ -488,7 +574,7 @@ def get_customer_order_by_id(
         db.query(Order)
         .filter(
             Order.id == order_id,
-            Order.customer_email == customer_email
+            Order.customer_email == cleaned_email
         )
         .first()
     )
@@ -502,9 +588,9 @@ def get_customer_order_by_id(
     return order
 
 
-# =========================================================
+# ==========================================================
 # UPDATE ORDER STATUS
-# =========================================================
+# ==========================================================
 
 def update_order_status(
     db: Session,
@@ -512,17 +598,15 @@ def update_order_status(
     status_data: OrderStatusUpdate
 ):
     """
-    Update the status of an order.
-
-    This function should normally be restricted to administrators.
+    Update an order's status and create a notification.
     """
 
     order = get_order_by_id(
-        db,
-        order_id
+        db=db,
+        order_id=order_id
     )
 
-    new_status = status_data.status
+    new_status = status_data.status.strip().title()
 
     if new_status not in ALLOWED_ORDER_STATUSES:
         raise HTTPException(
@@ -546,10 +630,18 @@ def update_order_status(
         )
 
     if new_status == "Cancelled":
-        return _cancel_order_and_restore_stock(
+        return cancel_order(
             db=db,
-            order=order
+            order_id=order_id,
+            is_admin=True
         )
+
+    if order.status == new_status:
+        return {
+            "message": f"Order is already {new_status}",
+            "notification_created": False,
+            "order": order
+        }
 
     order.status = new_status
 
@@ -565,23 +657,79 @@ def update_order_status(
             detail="Database error occurred while updating order status"
         )
 
+    notification_type_map = {
+        "Confirmed": "ORDER_CONFIRMED",
+        "Processing": "ORDER_PROCESSING",
+        "Shipped": "ORDER_SHIPPED",
+        "Delivered": "ORDER_DELIVERED"
+    }
+
+    title_map = {
+        "Confirmed": "Order Confirmed",
+        "Processing": "Order Processing",
+        "Shipped": "Order Shipped",
+        "Delivered": "Order Delivered"
+    }
+
+    notification_created = False
+
+    notification_type = notification_type_map.get(
+        new_status
+    )
+
+    if notification_type:
+        notification_created = send_order_notification(
+            customer_email=order.customer_email,
+            order_id=order.id,
+            notification_type=notification_type,
+            title=title_map[new_status],
+            message=(
+                f"Your order number {order.id} is now "
+                f"{new_status.lower()}."
+            )
+        )
+
     return {
         "message": "Order status updated successfully",
+        "notification_created": notification_created,
         "order": order
     }
 
 
-# =========================================================
-# INTERNAL CANCELLATION FUNCTION
-# =========================================================
+# ==========================================================
+# CANCEL ORDER
+# ==========================================================
 
-def _cancel_order_and_restore_stock(
+def cancel_order(
     db: Session,
-    order: Order
+    order_id: int,
+    customer_email: Optional[str] = None,
+    is_admin: bool = False
 ):
     """
-    Cancel an order and return its quantity to Product Service stock.
+    Cancel an order and restore the product stock.
+
+    Customers may cancel only their own orders.
+    Administrators may cancel any order.
     """
+
+    order = get_order_by_id(
+        db=db,
+        order_id=order_id
+    )
+
+    if not is_admin:
+        if not customer_email:
+            raise HTTPException(
+                status_code=401,
+                detail="Authenticated customer email is required"
+            )
+
+        if order.customer_email != customer_email.strip():
+            raise HTTPException(
+                status_code=403,
+                detail="You are not allowed to cancel this order"
+            )
 
     if order.status == "Cancelled":
         raise HTTPException(
@@ -589,32 +737,21 @@ def _cancel_order_and_restore_stock(
             detail="Order is already cancelled"
         )
 
-    if order.status in ("Shipped", "Delivered"):
+    if order.status == "Delivered":
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"An order with status '{order.status}' "
-                "cannot be cancelled"
-            )
+            detail="A delivered order cannot be cancelled"
         )
 
-    product = _get_product_from_service(
+    product = get_product_from_product_service(
         order.product_id
     )
 
-    try:
-        current_stock = int(product["stock"])
-
-    except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=502,
-            detail="Product Service returned invalid stock data"
-        )
-
+    current_stock = extract_product_stock(product)
     restored_stock = current_stock + order.quantity
 
-    _update_product_stock(
-        product_id=order.product_id,
+    update_product_stock(
+        product=product,
         new_stock=restored_stock
     )
 
@@ -628,14 +765,17 @@ def _cancel_order_and_restore_stock(
     except SQLAlchemyError:
         db.rollback()
 
-        # Compensating action: remove the stock that was restored.
+        # Compensation: revert the restored stock.
         try:
-            _update_product_stock(
-                product_id=order.product_id,
+            update_product_stock(
+                product=product,
                 new_stock=current_stock
             )
         except HTTPException:
-            pass
+            print(
+                "Critical warning: cancellation failed and "
+                "product stock could not be reverted automatically"
+            )
 
         order.status = previous_status
 
@@ -644,56 +784,28 @@ def _cancel_order_and_restore_stock(
             detail="Database error occurred while cancelling the order"
         )
 
+    notification_created = send_order_notification(
+        customer_email=order.customer_email,
+        order_id=order.id,
+        notification_type="ORDER_CANCELLED",
+        title="Order Cancelled",
+        message=(
+            f"Your order number {order.id} has been cancelled. "
+            f"The quantity of {order.product_name} has been "
+            "returned to stock."
+        )
+    )
+
     return {
         "message": "Order cancelled successfully",
+        "notification_created": notification_created,
         "order": order
     }
 
 
-# =========================================================
-# CANCEL CUSTOMER ORDER
-# =========================================================
-
-def cancel_order(
-    db: Session,
-    order_id: int,
-    customer_email: Optional[str] = None,
-    is_admin: bool = False
-):
-    """
-    Cancel an order.
-
-    Customers may cancel only their own orders.
-    Administrators may cancel any eligible order.
-    """
-
-    order = get_order_by_id(
-        db,
-        order_id
-    )
-
-    if not is_admin:
-        if not customer_email:
-            raise HTTPException(
-                status_code=401,
-                detail="Authenticated customer email is required"
-            )
-
-        if order.customer_email != customer_email:
-            raise HTTPException(
-                status_code=403,
-                detail="You are not allowed to cancel this order"
-            )
-
-    return _cancel_order_and_restore_stock(
-        db=db,
-        order=order
-    )
-
-
-# =========================================================
+# ==========================================================
 # SEARCH ORDERS
-# =========================================================
+# ==========================================================
 
 def search_orders(
     db: Session,
@@ -728,19 +840,19 @@ def search_orders(
     )
 
 
-# =========================================================
+# ==========================================================
 # FILTER ORDERS BY STATUS
-# =========================================================
+# ==========================================================
 
 def filter_orders_by_status(
     db: Session,
-    status: str
+    order_status: str
 ):
     """
-    Filter orders using an order status.
+    Filter orders using their status.
     """
 
-    normalized_status = status.strip().title()
+    normalized_status = order_status.strip().title()
 
     if normalized_status not in ALLOWED_ORDER_STATUSES:
         raise HTTPException(
@@ -759,16 +871,16 @@ def filter_orders_by_status(
     )
 
 
-# =========================================================
+# ==========================================================
 # FILTER ORDERS BY CUSTOMER
-# =========================================================
+# ==========================================================
 
 def filter_orders_by_customer(
     db: Session,
     customer_email: str
 ):
     """
-    Filter orders using a customer's email address.
+    Filter all orders by customer email.
     """
 
     cleaned_email = customer_email.strip()
@@ -791,9 +903,9 @@ def filter_orders_by_customer(
     )
 
 
-# =========================================================
-# PAGINATE ORDERS
-# =========================================================
+# ==========================================================
+# PAGINATE ALL ORDERS
+# ==========================================================
 
 def paginate_orders(
     db: Session,
@@ -801,20 +913,13 @@ def paginate_orders(
     limit: int
 ):
     """
-    Return paginated order records.
+    Return all orders using pagination.
     """
 
-    if page < 1:
-        page = 1
-
-    if limit < 1:
-        limit = 10
-
-    if limit > 100:
-        limit = 100
+    page = max(page, 1)
+    limit = min(max(limit, 1), 100)
 
     offset = (page - 1) * limit
-
     total = db.query(Order).count()
 
     orders = (
@@ -840,9 +945,9 @@ def paginate_orders(
     }
 
 
-# =========================================================
-# PAGINATE CURRENT CUSTOMER'S ORDERS
-# =========================================================
+# ==========================================================
+# PAGINATE CUSTOMER ORDERS
+# ==========================================================
 
 def paginate_customer_orders(
     db: Session,
@@ -851,29 +956,25 @@ def paginate_customer_orders(
     limit: int
 ):
     """
-    Return paginated orders belonging to one customer.
+    Return one customer's orders using pagination.
     """
 
-    if not customer_email:
+    cleaned_email = customer_email.strip()
+
+    if not cleaned_email:
         raise HTTPException(
             status_code=401,
             detail="Authenticated customer email is required"
         )
 
-    if page < 1:
-        page = 1
-
-    if limit < 1:
-        limit = 10
-
-    if limit > 100:
-        limit = 100
+    page = max(page, 1)
+    limit = min(max(limit, 1), 100)
 
     offset = (page - 1) * limit
 
     query = (
         db.query(Order)
-        .filter(Order.customer_email == customer_email)
+        .filter(Order.customer_email == cleaned_email)
     )
 
     total = query.count()
