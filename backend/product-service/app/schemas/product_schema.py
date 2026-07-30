@@ -58,3 +58,6 @@ class ProductResponse(ProductBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+class ProductStockUpdate(BaseModel):
+    stock: int = Field(..., ge=0)

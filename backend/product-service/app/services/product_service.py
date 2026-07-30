@@ -1,7 +1,10 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.product import Product
-from app.schemas.product_schema import ProductCreate, ProductUpdate
+from app.schemas.product_schema import (
+    ProductCreate,
+    ProductUpdate
+)
 
 
 # ==============================
@@ -9,7 +12,6 @@ from app.schemas.product_schema import ProductCreate, ProductUpdate
 # ==============================
 def create_product(db: Session, product: ProductCreate):
 
-    # Check duplicate product name
     existing_product = (
         db.query(Product)
         .filter(Product.name == product.name)
@@ -44,10 +46,7 @@ def create_product(db: Session, product: ProductCreate):
 # GET ALL PRODUCTS
 # ==============================
 def get_all_products(db: Session):
-
-    products = db.query(Product).all()
-
-    return products
+    return db.query(Product).all()
 
 
 # ==============================
@@ -79,21 +78,9 @@ def update_product(
     product_data: ProductUpdate
 ):
 
-    product = (
-        db.query(Product)
-        .filter(Product.id == product_id)
-        .first()
-    )
+    product = get_product_by_id(db, product_id)
 
-    if not product:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
-
-    # Prevent duplicate names
     if product_data.name:
-
         duplicate = (
             db.query(Product)
             .filter(
@@ -124,6 +111,33 @@ def update_product(
 
 
 # ==============================
+# INTERNAL STOCK UPDATE
+# ==============================
+def update_product_stock_internal(
+    db: Session,
+    product_id: int,
+    new_stock: int
+):
+    product = get_product_by_id(db, product_id)
+
+    if new_stock < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Product stock cannot be negative"
+        )
+
+    product.stock = new_stock
+
+    db.commit()
+    db.refresh(product)
+
+    return {
+        "message": "Product stock updated successfully",
+        "product": product
+    }
+
+
+# ==============================
 # DELETE PRODUCT
 # ==============================
 def delete_product(
@@ -131,17 +145,7 @@ def delete_product(
     product_id: int
 ):
 
-    product = (
-        db.query(Product)
-        .filter(Product.id == product_id)
-        .first()
-    )
-
-    if not product:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
+    product = get_product_by_id(db, product_id)
 
     db.delete(product)
     db.commit()
@@ -158,14 +162,11 @@ def search_products(
     db: Session,
     keyword: str
 ):
-
-    products = (
+    return (
         db.query(Product)
         .filter(Product.name.ilike(f"%{keyword}%"))
         .all()
     )
-
-    return products
 
 
 # ==============================
@@ -175,14 +176,11 @@ def filter_products(
     db: Session,
     category: str
 ):
-
-    products = (
+    return (
         db.query(Product)
         .filter(Product.category.ilike(category))
         .all()
     )
-
-    return products
 
 
 # ==============================

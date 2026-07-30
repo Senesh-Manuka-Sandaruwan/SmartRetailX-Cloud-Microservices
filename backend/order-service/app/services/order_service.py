@@ -27,8 +27,8 @@ PRODUCT_SERVICE_URL = os.getenv(
     "http://127.0.0.1:8001"
 ).rstrip("/")
 
-PRODUCT_SERVICE_TOKEN = os.getenv(
-    "PRODUCT_SERVICE_TOKEN",
+INTERNAL_SERVICE_KEY = os.getenv(
+    "INTERNAL_SERVICE_KEY",
     ""
 )
 
@@ -74,6 +74,23 @@ def build_authorization_headers(token: str) -> dict:
 
     return {
         "Authorization": f"Bearer {cleaned_token}"
+    }
+
+
+
+def build_service_headers() -> dict:
+    """
+    Create headers for trusted internal microservice communication.
+    """
+
+    if not INTERNAL_SERVICE_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="INTERNAL_SERVICE_KEY is not configured"
+        )
+
+    return {
+        "X-Service-Key": INTERNAL_SERVICE_KEY
     }
 
 
@@ -237,7 +254,8 @@ def update_product_stock(
     new_stock: int
 ):
     """
-    Update product stock through the Product Service.
+    Update product stock through the Product Service's
+    internal service-key-protected endpoint.
     """
 
     if new_stock < 0:
@@ -254,20 +272,11 @@ def update_product_stock(
             detail="Product ID is missing"
         )
 
-    payload = build_product_update_payload(
-        product=product,
-        new_stock=new_stock
-    )
-
-    headers = build_authorization_headers(
-        PRODUCT_SERVICE_TOKEN
-    )
-
     try:
         response = requests.put(
-            f"{PRODUCT_SERVICE_URL}/products/{product_id}",
-            json=payload,
-            headers=headers,
+            f"{PRODUCT_SERVICE_URL}/products/internal/{product_id}/stock",
+            json={"stock": new_stock},
+            headers=build_service_headers(),
             timeout=10
         )
 
@@ -285,7 +294,7 @@ def update_product_stock(
             status_code=502,
             detail=(
                 "Order Service is not authorized to update product stock. "
-                "Check PRODUCT_SERVICE_TOKEN."
+                "Check that INTERNAL_SERVICE_KEY is identical in both services."
             )
         )
 
@@ -296,10 +305,7 @@ def update_product_stock(
             error_body = response.json()
 
             if isinstance(error_body, dict):
-                detail = error_body.get(
-                    "detail",
-                    detail
-                )
+                detail = error_body.get("detail", detail)
         except ValueError:
             pass
 
@@ -383,7 +389,7 @@ def create_order(
 ):
     """
     Create an order, calculate its total price,
-    and reduce the corresponding product stock.
+    reduce product stock, and create a notification.
     """
 
     cleaned_email = customer_email.strip()
@@ -429,7 +435,7 @@ def create_order(
         status="Pending"
     )
 
-    # Update stock before storing the order.
+    # Reduce product stock before storing the order.
     update_product_stock(
         product=product,
         new_stock=new_stock
@@ -443,7 +449,7 @@ def create_order(
     except SQLAlchemyError:
         db.rollback()
 
-        # Compensation: restore stock if order storage fails.
+        # Restore stock if saving the order fails.
         try:
             update_product_stock(
                 product=product,
