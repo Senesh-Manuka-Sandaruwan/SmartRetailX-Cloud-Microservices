@@ -12,52 +12,18 @@ import { useAuth } from "../context/AuthContext";
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
 
-
-const CustomerDashboardPlaceholder = () => {
-    const { user, logout } = useAuth();
-
-    return (
-        <main className="temporary-dashboard-page">
-            <section className="temporary-dashboard-card">
-                <div className="temporary-dashboard-icon">
-                    🛍️
-                </div>
-
-                <span className="welcome-chip">
-                    Customer area
-                </span>
-
-                <h1>
-                    Welcome to SmartRetailX
-                </h1>
-
-                <p>
-                    Signed in as{" "}
-                    <strong>
-                        {user?.sub || user?.email || "Customer"}
-                    </strong>
-                </p>
-
-                <p className="temporary-dashboard-description">
-                    Your customer dashboard is ready. Product browsing,
-                    shopping cart, orders and notifications will be added next.
-                </p>
-
-                <button
-                    className="primary-button"
-                    type="button"
-                    onClick={logout}
-                >
-                    Sign out
-                </button>
-            </section>
-        </main>
-    );
-};
+import CustomerDashboard from "../pages/customer/CustomerDashboard";
+import Products from "../pages/customer/Products";
+import ProductDetails from "../pages/customer/ProductDetails";
+import MyOrders from "../pages/customer/MyOrders";
+import Notifications from "../pages/customer/Notifications";
 
 
 const AdminDashboardPlaceholder = () => {
-    const { user, logout } = useAuth();
+    const {
+        user,
+        logout
+    } = useAuth();
 
     return (
         <main className="temporary-dashboard-page admin-placeholder-page">
@@ -77,13 +43,16 @@ const AdminDashboardPlaceholder = () => {
                 <p>
                     Signed in as{" "}
                     <strong>
-                        {user?.sub || user?.email || "Administrator"}
+                        {user?.sub ||
+                            user?.email ||
+                            "Administrator"}
                     </strong>
                 </p>
 
                 <p className="temporary-dashboard-description">
-                    Product management, order administration, notifications
-                    and dashboard analytics will be added next.
+                    Product management, order administration,
+                    notifications and dashboard analytics will be
+                    added next.
                 </p>
 
                 <button
@@ -107,10 +76,13 @@ const NotFound = () => {
                     404
                 </div>
 
-                <h1>Page not found</h1>
+                <h1>
+                    Page not found
+                </h1>
 
                 <p>
-                    The page you requested does not exist or may have moved.
+                    The page you requested does not exist or may
+                    have moved.
                 </p>
 
                 <a
@@ -125,6 +97,58 @@ const NotFound = () => {
 };
 
 
+const Unauthorized = () => {
+    return (
+        <main className="not-found-page">
+            <section className="not-found-card">
+                <div className="temporary-dashboard-icon">
+                    🔒
+                </div>
+
+                <h1>
+                    Access denied
+                </h1>
+
+                <p>
+                    You do not have permission to access this
+                    section.
+                </p>
+
+                <a
+                    className="primary-button"
+                    href="/"
+                >
+                    Return to dashboard
+                </a>
+            </section>
+        </main>
+    );
+};
+
+
+const LoadingScreen = ({ message }) => {
+    return (
+        <main className="route-loading-page">
+            <div className="route-loading-card">
+                <div className="route-loading-logo">
+                    ✦
+                </div>
+
+                <div className="route-loading-spinner" />
+
+                <h2>
+                    Loading SmartRetailX
+                </h2>
+
+                <p>
+                    {message}
+                </p>
+            </div>
+        </main>
+    );
+};
+
+
 const HomeRedirect = () => {
     const {
         loading,
@@ -134,21 +158,7 @@ const HomeRedirect = () => {
 
     if (loading) {
         return (
-            <main className="route-loading-page">
-                <div className="route-loading-card">
-                    <div className="route-loading-logo">
-                        ✦
-                    </div>
-
-                    <div className="route-loading-spinner" />
-
-                    <h2>Loading SmartRetailX</h2>
-
-                    <p>
-                        Preparing your account...
-                    </p>
-                </div>
-            </main>
+            <LoadingScreen message="Preparing your account..." />
         );
     }
 
@@ -179,21 +189,7 @@ const PublicOnlyRoute = ({ children }) => {
 
     if (loading) {
         return (
-            <main className="route-loading-page">
-                <div className="route-loading-card">
-                    <div className="route-loading-logo">
-                        ✦
-                    </div>
-
-                    <div className="route-loading-spinner" />
-
-                    <h2>Loading SmartRetailX</h2>
-
-                    <p>
-                        Checking your session...
-                    </p>
-                </div>
-            </main>
+            <LoadingScreen message="Checking your session..." />
         );
     }
 
@@ -213,11 +209,13 @@ const PublicOnlyRoute = ({ children }) => {
 const AppRoutes = () => {
     return (
         <Routes>
+            {/* Home */}
             <Route
                 path="/"
                 element={<HomeRedirect />}
             />
 
+            {/* Public authentication routes */}
             <Route
                 path="/login"
                 element={
@@ -236,15 +234,57 @@ const AppRoutes = () => {
                 }
             />
 
+            {/* Customer dashboard */}
             <Route
                 path="/customer"
                 element={
                     <ProtectedRoute allowedRoles={["customer"]}>
-                        <CustomerDashboardPlaceholder />
+                        <CustomerDashboard />
                     </ProtectedRoute>
                 }
             />
 
+            {/* Customer product catalogue */}
+            <Route
+                path="/customer/products"
+                element={
+                    <ProtectedRoute allowedRoles={["customer"]}>
+                        <Products />
+                    </ProtectedRoute>
+                }
+            />
+
+            {/* Customer product details */}
+            <Route
+                path="/customer/products/:productId"
+                element={
+                    <ProtectedRoute allowedRoles={["customer"]}>
+                        <ProductDetails />
+                    </ProtectedRoute>
+                }
+            />
+
+            {/* Customer orders */}
+            <Route
+                path="/customer/orders"
+                element={
+                    <ProtectedRoute allowedRoles={["customer"]}>
+                        <MyOrders />
+                    </ProtectedRoute>
+                }
+            />
+
+            {/* Customer notifications */}
+            <Route
+                path="/customer/notifications"
+                element={
+                    <ProtectedRoute allowedRoles={["customer"]}>
+                        <Notifications />
+                    </ProtectedRoute>
+                }
+            />
+
+            {/* Admin dashboard */}
             <Route
                 path="/admin"
                 element={
@@ -254,33 +294,13 @@ const AppRoutes = () => {
                 }
             />
 
+            {/* Access denied */}
             <Route
                 path="/unauthorized"
-                element={
-                    <main className="not-found-page">
-                        <section className="not-found-card">
-                            <div className="temporary-dashboard-icon">
-                                🔒
-                            </div>
-
-                            <h1>Access denied</h1>
-
-                            <p>
-                                You do not have permission to access this
-                                section.
-                            </p>
-
-                            <a
-                                className="primary-button"
-                                href="/"
-                            >
-                                Return to dashboard
-                            </a>
-                        </section>
-                    </main>
-                }
+                element={<Unauthorized />}
             />
 
+            {/* Invalid routes */}
             <Route
                 path="*"
                 element={<NotFound />}
