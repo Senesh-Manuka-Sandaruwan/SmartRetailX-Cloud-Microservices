@@ -5,13 +5,21 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
+import {
+    CartProvider
+} from "./context/CartContext.jsx";
+
 import "./styles/global.css";
 
-createRoot(document.getElementById("root")).render(
+createRoot(
+    document.getElementById("root")
+).render(
     <StrictMode>
         <BrowserRouter>
             <AuthProvider>
-                <App />
+                <CartProvider>
+                    <App />
+                </CartProvider>
             </AuthProvider>
         </BrowserRouter>
     </StrictMode>

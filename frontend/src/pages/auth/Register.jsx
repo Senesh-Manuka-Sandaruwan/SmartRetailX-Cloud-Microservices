@@ -1,5 +1,13 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+    useMemo,
+    useState
+} from "react";
+
+import {
+    Link,
+    useLocation,
+    useNavigate
+} from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 
@@ -49,25 +57,34 @@ const getPasswordStrength = (password) => {
 
 
 const formatBackendError = (requestError) => {
-    const detail = requestError.response?.data?.detail;
+    const detail =
+        requestError.response?.data?.detail;
 
     if (typeof detail === "string") {
         return detail;
     }
 
-    if (Array.isArray(detail) && detail.length > 0) {
+    if (
+        Array.isArray(detail) &&
+        detail.length > 0
+    ) {
         return detail
             .map((item) => item.msg)
             .filter(Boolean)
             .join(" ");
     }
 
-    return "Registration failed. Please check your details and try again.";
+    return (
+        "Registration failed. Please check your " +
+        "details and try again."
+    );
 };
 
 
 const Register = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+
     const { register } = useAuth();
 
     const [formData, setFormData] = useState({
@@ -77,29 +94,65 @@ const Register = () => {
         confirmPassword: ""
     });
 
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showPassword, setShowPassword] =
+        useState(false);
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
+    const [
+        showConfirmPassword,
+        setShowConfirmPassword
+    ] = useState(false);
+
+    const [loading, setLoading] =
+        useState(false);
+
+    const [error, setError] =
+        useState("");
+
+    const [success, setSuccess] =
+        useState("");
+
+
+    const requestedDestination =
+        location.state?.from || null;
+
+
+    const checkoutMessage =
+        location.state?.checkoutMessage || "";
 
 
     const passwordStrength = useMemo(
-        () => getPasswordStrength(formData.password),
+        () =>
+            getPasswordStrength(
+                formData.password
+            ),
         [formData.password]
     );
 
 
     const passwordChecks = useMemo(
         () => ({
-            minimumLength: formData.password.length >= 8,
-            uppercase: /[A-Z]/.test(formData.password),
-            lowercase: /[a-z]/.test(formData.password),
-            number: /\d/.test(formData.password),
+            minimumLength:
+                formData.password.length >= 8,
+
+            uppercase:
+                /[A-Z]/.test(
+                    formData.password
+                ),
+
+            lowercase:
+                /[a-z]/.test(
+                    formData.password
+                ),
+
+            number:
+                /\d/.test(
+                    formData.password
+                ),
+
             passwordsMatch:
                 formData.password.length > 0 &&
-                formData.password === formData.confirmPassword
+                formData.password ===
+                    formData.confirmPassword
         }),
         [
             formData.password,
@@ -109,7 +162,10 @@ const Register = () => {
 
 
     const handleChange = (event) => {
-        const { name, value } = event.target;
+        const {
+            name,
+            value
+        } = event.target;
 
         setFormData((previousData) => ({
             ...previousData,
@@ -136,19 +192,31 @@ const Register = () => {
         }
 
         if (!passwordChecks.minimumLength) {
-            return "Password must contain at least 8 characters.";
+            return (
+                "Password must contain at least " +
+                "8 characters."
+            );
         }
 
         if (!passwordChecks.uppercase) {
-            return "Password must contain at least one uppercase letter.";
+            return (
+                "Password must contain at least " +
+                "one uppercase letter."
+            );
         }
 
         if (!passwordChecks.lowercase) {
-            return "Password must contain at least one lowercase letter.";
+            return (
+                "Password must contain at least " +
+                "one lowercase letter."
+            );
         }
 
         if (!passwordChecks.number) {
-            return "Password must contain at least one number.";
+            return (
+                "Password must contain at least " +
+                "one number."
+            );
         }
 
         if (!passwordChecks.passwordsMatch) {
@@ -165,7 +233,8 @@ const Register = () => {
         setError("");
         setSuccess("");
 
-        const validationError = validateForm();
+        const validationError =
+            validateForm();
 
         if (validationError) {
             setError(validationError);
@@ -176,24 +245,55 @@ const Register = () => {
 
         try {
             await register({
-                full_name: formData.full_name.trim(),
-                email: formData.email.trim().toLowerCase(),
-                password: formData.password
+                full_name:
+                    formData.full_name.trim(),
+
+                email:
+                    formData.email
+                        .trim()
+                        .toLowerCase(),
+
+                password:
+                    formData.password
             });
 
             setSuccess(
-                "Your SmartRetailX account was created successfully."
+                "Your SmartRetailX account " +
+                "was created successfully."
             );
 
-            setTimeout(() => {
-                navigate("/login", {
-                    state: {
-                        registrationSuccess: true
+            window.setTimeout(() => {
+                navigate(
+                    "/login",
+                    {
+                        replace: true,
+
+                        state: {
+                            registrationSuccess: true,
+
+                            from:
+                                requestedDestination,
+
+                            checkoutMessage:
+                                requestedDestination
+                                    ?.startsWith(
+                                        "/checkout"
+                                    )
+                                    ? (
+                                        "Your account was created. " +
+                                        "Sign in to return to checkout."
+                                    )
+                                    : checkoutMessage
+                        }
                     }
-                });
-            }, 1300);
+                );
+            }, 1200);
         } catch (requestError) {
-            setError(formatBackendError(requestError));
+            setError(
+                formatBackendError(
+                    requestError
+                )
+            );
         } finally {
             setLoading(false);
         }
@@ -209,7 +309,10 @@ const Register = () => {
             <section className="register-shell">
                 <aside className="register-showcase">
                     <div className="brand-badge register-brand-badge">
-                        <span className="brand-badge-icon">✦</span>
+                        <span className="brand-badge-icon">
+                            ✦
+                        </span>
+
                         SmartRetailX
                     </div>
 
@@ -220,48 +323,67 @@ const Register = () => {
 
                         <h1>
                             One account.
-                            <span>Everything connected.</span>
+                            <span>
+                                Everything connected.
+                            </span>
                         </h1>
 
                         <p>
-                            Discover products, place orders, track progress and
-                            receive important updates from one secure platform.
+                            Discover products, place orders,
+                            track progress and receive important
+                            updates from one secure platform.
                         </p>
                     </div>
 
                     <div className="register-benefits">
                         <div className="register-benefit-card">
-                            <span className="register-benefit-icon">⚡</span>
+                            <span className="register-benefit-icon">
+                                ⚡
+                            </span>
 
                             <div>
-                                <h3>Fast ordering</h3>
+                                <h3>
+                                    Fast ordering
+                                </h3>
+
                                 <p>
-                                    Create orders through a smooth and simple
-                                    shopping experience.
+                                    Build your cart first and
+                                    register only when checkout
+                                    requires authentication.
                                 </p>
                             </div>
                         </div>
 
                         <div className="register-benefit-card">
-                            <span className="register-benefit-icon">📦</span>
+                            <span className="register-benefit-icon">
+                                📦
+                            </span>
 
                             <div>
-                                <h3>Order tracking</h3>
+                                <h3>
+                                    Order tracking
+                                </h3>
+
                                 <p>
-                                    Follow every stage from pending to
-                                    delivery.
+                                    Follow every stage from
+                                    pending to delivery.
                                 </p>
                             </div>
                         </div>
 
                         <div className="register-benefit-card">
-                            <span className="register-benefit-icon">🔔</span>
+                            <span className="register-benefit-icon">
+                                🔔
+                            </span>
 
                             <div>
-                                <h3>Instant notifications</h3>
+                                <h3>
+                                    Instant notifications
+                                </h3>
+
                                 <p>
-                                    Stay informed whenever your order status
-                                    changes.
+                                    Stay informed whenever your
+                                    order status changes.
                                 </p>
                             </div>
                         </div>
@@ -275,7 +397,8 @@ const Register = () => {
                         </div>
 
                         <p>
-                            Built for modern customers and retail teams.
+                            Built for modern customers and
+                            retail teams.
                         </p>
                     </div>
                 </aside>
@@ -283,7 +406,10 @@ const Register = () => {
                 <section className="register-form-panel">
                     <div className="register-mobile-brand">
                         <div className="brand-badge">
-                            <span className="brand-badge-icon">✦</span>
+                            <span className="brand-badge-icon">
+                                ✦
+                            </span>
+
                             SmartRetailX
                         </div>
                     </div>
@@ -294,13 +420,40 @@ const Register = () => {
                                 Create account
                             </span>
 
-                            <h2>Start your SmartRetailX journey</h2>
+                            <h2>
+                                Start your SmartRetailX journey
+                            </h2>
 
                             <p>
-                                Enter your information to create a secure
-                                customer account.
+                                Enter your information to create
+                                a secure customer account.
                             </p>
                         </header>
+
+                        {requestedDestination?.startsWith(
+                            "/checkout"
+                        ) && (
+                            <div
+                                className="register-checkout-message"
+                                role="status"
+                            >
+                                <span>
+                                    🛒
+                                </span>
+
+                                <div>
+                                    <strong>
+                                        Your cart is still saved
+                                    </strong>
+
+                                    <p>
+                                        Create your account, sign in
+                                        and you will return directly
+                                        to checkout.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         <form
                             className="register-form"
@@ -315,14 +468,18 @@ const Register = () => {
                                 </label>
 
                                 <div className="input-wrapper">
-                                    <span className="input-icon">●</span>
+                                    <span className="input-icon">
+                                        ●
+                                    </span>
 
                                     <input
                                         id="full_name"
                                         className="form-control register-input"
                                         type="text"
                                         name="full_name"
-                                        value={formData.full_name}
+                                        value={
+                                            formData.full_name
+                                        }
                                         onChange={handleChange}
                                         placeholder="Senesh Sandaruwan"
                                         autoComplete="name"
@@ -342,7 +499,9 @@ const Register = () => {
                                 </label>
 
                                 <div className="input-wrapper">
-                                    <span className="input-icon">✉</span>
+                                    <span className="input-icon">
+                                        ✉
+                                    </span>
 
                                     <input
                                         id="register-email"
@@ -368,7 +527,9 @@ const Register = () => {
                                     </label>
 
                                     <div className="input-wrapper">
-                                        <span className="input-icon">●</span>
+                                        <span className="input-icon">
+                                            ●
+                                        </span>
 
                                         <input
                                             id="register-password"
@@ -379,8 +540,12 @@ const Register = () => {
                                                     : "password"
                                             }
                                             name="password"
-                                            value={formData.password}
-                                            onChange={handleChange}
+                                            value={
+                                                formData.password
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
                                             placeholder="Create password"
                                             autoComplete="new-password"
                                             required
@@ -391,12 +556,16 @@ const Register = () => {
                                             type="button"
                                             onClick={() => {
                                                 setShowPassword(
-                                                    (currentValue) =>
+                                                    (
+                                                        currentValue
+                                                    ) =>
                                                         !currentValue
                                                 );
                                             }}
                                         >
-                                            {showPassword ? "Hide" : "Show"}
+                                            {showPassword
+                                                ? "Hide"
+                                                : "Show"}
                                         </button>
                                     </div>
                                 </div>
@@ -410,7 +579,9 @@ const Register = () => {
                                     </label>
 
                                     <div className="input-wrapper">
-                                        <span className="input-icon">✓</span>
+                                        <span className="input-icon">
+                                            ✓
+                                        </span>
 
                                         <input
                                             id="confirm-password"
@@ -421,8 +592,12 @@ const Register = () => {
                                                     : "password"
                                             }
                                             name="confirmPassword"
-                                            value={formData.confirmPassword}
-                                            onChange={handleChange}
+                                            value={
+                                                formData.confirmPassword
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
                                             placeholder="Repeat password"
                                             autoComplete="new-password"
                                             required
@@ -433,7 +608,9 @@ const Register = () => {
                                             type="button"
                                             onClick={() => {
                                                 setShowConfirmPassword(
-                                                    (currentValue) =>
+                                                    (
+                                                        currentValue
+                                                    ) =>
                                                         !currentValue
                                                 );
                                             }}
@@ -449,7 +626,9 @@ const Register = () => {
                             {formData.password && (
                                 <div className="password-strength-panel">
                                     <div className="password-strength-header">
-                                        <p>Password strength</p>
+                                        <p>
+                                            Password strength
+                                        </p>
 
                                         <span
                                             className={
@@ -457,22 +636,29 @@ const Register = () => {
                                                 `strength-level-${passwordStrength.level}`
                                             }
                                         >
-                                            {passwordStrength.label}
+                                            {
+                                                passwordStrength.label
+                                            }
                                         </span>
                                     </div>
 
                                     <div className="strength-bars">
-                                        {[1, 2, 3].map((level) => (
-                                            <span
-                                                key={level}
-                                                className={
-                                                    level <=
-                                                    passwordStrength.level
-                                                        ? `strength-bar active level-${passwordStrength.level}`
-                                                        : "strength-bar"
-                                                }
-                                            />
-                                        ))}
+                                        {[1, 2, 3].map(
+                                            (level) => (
+                                                <span
+                                                    key={level}
+                                                    className={
+                                                        level <=
+                                                        passwordStrength.level
+                                                            ? (
+                                                                `strength-bar active ` +
+                                                                `level-${passwordStrength.level}`
+                                                            )
+                                                            : "strength-bar"
+                                                    }
+                                                />
+                                            )
+                                        )}
                                     </div>
 
                                     <div className="password-check-grid">
@@ -484,10 +670,13 @@ const Register = () => {
                                             }
                                         >
                                             <b>
-                                                {passwordChecks.minimumLength
-                                                    ? "✓"
-                                                    : "○"}
+                                                {
+                                                    passwordChecks.minimumLength
+                                                        ? "✓"
+                                                        : "○"
+                                                }
                                             </b>
+
                                             8 characters
                                         </span>
 
@@ -499,10 +688,13 @@ const Register = () => {
                                             }
                                         >
                                             <b>
-                                                {passwordChecks.uppercase
-                                                    ? "✓"
-                                                    : "○"}
+                                                {
+                                                    passwordChecks.uppercase
+                                                        ? "✓"
+                                                        : "○"
+                                                }
                                             </b>
+
                                             Uppercase
                                         </span>
 
@@ -514,10 +706,13 @@ const Register = () => {
                                             }
                                         >
                                             <b>
-                                                {passwordChecks.lowercase
-                                                    ? "✓"
-                                                    : "○"}
+                                                {
+                                                    passwordChecks.lowercase
+                                                        ? "✓"
+                                                        : "○"
+                                                }
                                             </b>
+
                                             Lowercase
                                         </span>
 
@@ -529,10 +724,13 @@ const Register = () => {
                                             }
                                         >
                                             <b>
-                                                {passwordChecks.number
-                                                    ? "✓"
-                                                    : "○"}
+                                                {
+                                                    passwordChecks.number
+                                                        ? "✓"
+                                                        : "○"
+                                                }
                                             </b>
+
                                             Number
                                         </span>
 
@@ -544,10 +742,13 @@ const Register = () => {
                                             }
                                         >
                                             <b>
-                                                {passwordChecks.passwordsMatch
-                                                    ? "✓"
-                                                    : "○"}
+                                                {
+                                                    passwordChecks.passwordsMatch
+                                                        ? "✓"
+                                                        : "○"
+                                                }
                                             </b>
+
                                             Passwords match
                                         </span>
                                     </div>
@@ -559,7 +760,10 @@ const Register = () => {
                                     className="error-message register-alert"
                                     role="alert"
                                 >
-                                    <span>⚠</span>
+                                    <span>
+                                        ⚠
+                                    </span>
+
                                     {error}
                                 </div>
                             )}
@@ -569,7 +773,10 @@ const Register = () => {
                                     className="success-message register-alert"
                                     role="status"
                                 >
-                                    <span>✓</span>
+                                    <span>
+                                        ✓
+                                    </span>
+
                                     {success}
                                 </div>
                             )}
@@ -581,8 +788,9 @@ const Register = () => {
                                 />
 
                                 <span>
-                                    I agree to use SmartRetailX responsibly
-                                    and accept the platform terms.
+                                    I agree to use SmartRetailX
+                                    responsibly and accept the
+                                    platform terms.
                                 </span>
                             </label>
 
@@ -599,7 +807,10 @@ const Register = () => {
                                 ) : (
                                     <>
                                         Create account
-                                        <span className="button-arrow">→</span>
+
+                                        <span className="button-arrow">
+                                            →
+                                        </span>
                                     </>
                                 )}
                             </button>
@@ -607,15 +818,41 @@ const Register = () => {
 
                         <div className="login-divider register-divider">
                             <span />
-                            <p>Already registered?</p>
+
+                            <p>
+                                Already registered?
+                            </p>
+
                             <span />
                         </div>
 
                         <Link
                             className="register-login-link"
                             to="/login"
+                            state={{
+                                from:
+                                    requestedDestination,
+
+                                checkoutMessage:
+                                    requestedDestination
+                                        ?.startsWith(
+                                            "/checkout"
+                                        )
+                                        ? (
+                                            "Sign in to return to " +
+                                            "your checkout."
+                                        )
+                                        : checkoutMessage
+                            }}
                         >
                             Sign in to your account
+                        </Link>
+
+                        <Link
+                            className="register-return-store-link"
+                            to="/"
+                        >
+                            ← Return to store
                         </Link>
                     </div>
                 </section>

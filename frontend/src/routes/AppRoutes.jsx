@@ -9,14 +9,22 @@ import ProtectedRoute from "../components/ProtectedRoute";
 
 import { useAuth } from "../context/AuthContext";
 
+import PublicLayout from "../layouts/PublicLayout";
+
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
+
+import Home from "../pages/public/Home";
 
 import CustomerDashboard from "../pages/customer/CustomerDashboard";
 import Products from "../pages/customer/Products";
 import ProductDetails from "../pages/customer/ProductDetails";
 import MyOrders from "../pages/customer/MyOrders";
 import Notifications from "../pages/customer/Notifications";
+import Cart from "../pages/public/Cart";
+import Checkout from "../pages/public/Checkout";
+import PublicProducts from "../pages/public/PublicProducts";
+import PublicProductDetails from "../pages/public/PublicProductDetails";
 
 
 const AdminDashboardPlaceholder = () => {
@@ -68,64 +76,6 @@ const AdminDashboardPlaceholder = () => {
 };
 
 
-const NotFound = () => {
-    return (
-        <main className="not-found-page">
-            <section className="not-found-card">
-                <div className="not-found-number">
-                    404
-                </div>
-
-                <h1>
-                    Page not found
-                </h1>
-
-                <p>
-                    The page you requested does not exist or may
-                    have moved.
-                </p>
-
-                <a
-                    className="primary-button"
-                    href="/"
-                >
-                    Return home
-                </a>
-            </section>
-        </main>
-    );
-};
-
-
-const Unauthorized = () => {
-    return (
-        <main className="not-found-page">
-            <section className="not-found-card">
-                <div className="temporary-dashboard-icon">
-                    🔒
-                </div>
-
-                <h1>
-                    Access denied
-                </h1>
-
-                <p>
-                    You do not have permission to access this
-                    section.
-                </p>
-
-                <a
-                    className="primary-button"
-                    href="/"
-                >
-                    Return to dashboard
-                </a>
-            </section>
-        </main>
-    );
-};
-
-
 const LoadingScreen = ({ message }) => {
     return (
         <main className="route-loading-page">
@@ -140,42 +90,9 @@ const LoadingScreen = ({ message }) => {
                     Loading SmartRetailX
                 </h2>
 
-                <p>
-                    {message}
-                </p>
+                <p>{message}</p>
             </div>
         </main>
-    );
-};
-
-
-const HomeRedirect = () => {
-    const {
-        loading,
-        isAuthenticated,
-        isAdmin
-    } = useAuth();
-
-    if (loading) {
-        return (
-            <LoadingScreen message="Preparing your account..." />
-        );
-    }
-
-    if (!isAuthenticated) {
-        return (
-            <Navigate
-                to="/login"
-                replace
-            />
-        );
-    }
-
-    return (
-        <Navigate
-            to={isAdmin ? "/admin" : "/customer"}
-            replace
-        />
     );
 };
 
@@ -206,16 +123,95 @@ const PublicOnlyRoute = ({ children }) => {
 };
 
 
+const Unauthorized = () => {
+    return (
+        <main className="not-found-page">
+            <section className="not-found-card">
+                <div className="temporary-dashboard-icon">
+                    🔒
+                </div>
+
+                <h1>
+                    Access denied
+                </h1>
+
+                <p>
+                    You do not have permission to access this section.
+                </p>
+
+                <a
+                    className="primary-button"
+                    href="/"
+                >
+                    Return home
+                </a>
+            </section>
+        </main>
+    );
+};
+
+
+const NotFound = () => {
+    return (
+        <main className="not-found-page">
+            <section className="not-found-card">
+                <div className="not-found-number">
+                    404
+                </div>
+
+                <h1>
+                    Page not found
+                </h1>
+
+                <p>
+                    The requested page does not exist or may have moved.
+                </p>
+
+                <a
+                    className="primary-button"
+                    href="/"
+                >
+                    Return home
+                </a>
+            </section>
+        </main>
+    );
+};
+
+
 const AppRoutes = () => {
     return (
         <Routes>
-            {/* Home */}
-            <Route
-                path="/"
-                element={<HomeRedirect />}
-            />
+            {/* Public website */}
+            <Route element={<PublicLayout />}>
+                <Route
+                    path="/"
+                    element={<Home />}
+                />
 
-            {/* Public authentication routes */}
+                <Route
+                    path="/products"
+                    element={<PublicProducts />}
+                />
+
+                <Route
+                    path="/products/:productId"
+                    element={<PublicProductDetails />}
+                />
+
+                <Route
+                    path="/cart"
+                    element={<Cart />}
+                />
+
+                <Route
+                    path="/checkout"
+                    element={<Checkout />}
+                />
+
+            </Route>
+
+            {/* Public authentication */}
             <Route
                 path="/login"
                 element={
@@ -244,7 +240,6 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Customer product catalogue */}
             <Route
                 path="/customer/products"
                 element={
@@ -254,7 +249,6 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Customer product details */}
             <Route
                 path="/customer/products/:productId"
                 element={
@@ -264,7 +258,6 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Customer orders */}
             <Route
                 path="/customer/orders"
                 element={
@@ -274,7 +267,6 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Customer notifications */}
             <Route
                 path="/customer/notifications"
                 element={
@@ -284,7 +276,7 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Admin dashboard */}
+            {/* Admin */}
             <Route
                 path="/admin"
                 element={
@@ -294,13 +286,11 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Access denied */}
             <Route
                 path="/unauthorized"
                 element={<Unauthorized />}
             />
 
-            {/* Invalid routes */}
             <Route
                 path="*"
                 element={<NotFound />}
