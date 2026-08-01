@@ -1,43 +1,90 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from datetime import datetime
 from typing import Optional
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator
+)
 
 
 class ProductBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=150)
-    description: str = Field(..., min_length=5, max_length=500)
-    category: str = Field(..., min_length=2, max_length=100)
-    price: float = Field(..., gt=0)
-    stock: int = Field(..., ge=0)
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=150
+    )
 
-    @field_validator("name")
+    description: str = Field(
+        ...,
+        min_length=5,
+        max_length=500
+    )
+
+    category: str = Field(
+        ...,
+        min_length=2,
+        max_length=100
+    )
+
+    image_url: Optional[str] = Field(
+        default=None,
+        max_length=1000
+    )
+
+    price: float = Field(
+        ...,
+        gt=0
+    )
+
+    stock: int = Field(
+        ...,
+        ge=0
+    )
+
+    @field_validator(
+        "name",
+        "category",
+        "description"
+    )
     @classmethod
-    def validate_name(cls, value):
-        value = value.strip()
+    def validate_required_text(
+        cls,
+        value: str
+    ) -> str:
+        cleaned_value = value.strip()
 
-        if not value:
-            raise ValueError("Product name cannot be empty")
+        if not cleaned_value:
+            raise ValueError(
+                "This field cannot be empty"
+            )
 
-        return value
+        return cleaned_value
 
-    @field_validator("category")
+    @field_validator("image_url")
     @classmethod
-    def validate_category(cls, value):
-        value = value.strip()
+    def validate_image_url(
+        cls,
+        value: Optional[str]
+    ) -> Optional[str]:
+        if value is None:
+            return None
 
-        if not value:
-            raise ValueError("Category cannot be empty")
+        cleaned_value = value.strip()
 
-        return value
+        if not cleaned_value:
+            return None
 
-    @field_validator("description")
-    @classmethod
-    def validate_description(cls, value):
-        value = value.strip()
+        if not cleaned_value.startswith(
+            ("http://", "https://")
+        ):
+            raise ValueError(
+                "Image URL must start with "
+                "http:// or https://"
+            )
 
-        if not value:
-            raise ValueError("Description cannot be empty")
-
-        return value
+        return cleaned_value
 
 
 class ProductCreate(ProductBase):
@@ -45,19 +92,102 @@ class ProductCreate(ProductBase):
 
 
 class ProductUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=150)
-    description: Optional[str] = Field(None, min_length=5, max_length=500)
-    category: Optional[str] = Field(None, min_length=2, max_length=100)
-    price: Optional[float] = Field(None, gt=0)
-    stock: Optional[int] = Field(None, ge=0)
+    name: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=150
+    )
 
-    model_config = ConfigDict(extra="forbid")
+    description: Optional[str] = Field(
+        default=None,
+        min_length=5,
+        max_length=500
+    )
+
+    category: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=100
+    )
+
+    image_url: Optional[str] = Field(
+        default=None,
+        max_length=1000
+    )
+
+    price: Optional[float] = Field(
+        default=None,
+        gt=0
+    )
+
+    stock: Optional[int] = Field(
+        default=None,
+        ge=0
+    )
+
+    @field_validator(
+        "name",
+        "category",
+        "description"
+    )
+    @classmethod
+    def validate_optional_text(
+        cls,
+        value: Optional[str]
+    ) -> Optional[str]:
+        if value is None:
+            return None
+
+        cleaned_value = value.strip()
+
+        if not cleaned_value:
+            raise ValueError(
+                "This field cannot be empty"
+            )
+
+        return cleaned_value
+
+    @field_validator("image_url")
+    @classmethod
+    def validate_optional_image_url(
+        cls,
+        value: Optional[str]
+    ) -> Optional[str]:
+        if value is None:
+            return None
+
+        cleaned_value = value.strip()
+
+        if not cleaned_value:
+            return None
+
+        if not cleaned_value.startswith(
+            ("http://", "https://")
+        ):
+            raise ValueError(
+                "Image URL must start with "
+                "http:// or https://"
+            )
+
+        return cleaned_value
+
+    model_config = ConfigDict(
+        extra="forbid"
+    )
 
 
 class ProductResponse(ProductBase):
     id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
 
 class ProductStockUpdate(BaseModel):
-    stock: int = Field(..., ge=0)
+    stock: int = Field(
+        ...,
+        ge=0
+    )

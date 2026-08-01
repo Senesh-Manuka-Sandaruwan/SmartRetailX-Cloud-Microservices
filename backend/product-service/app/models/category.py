@@ -1,7 +1,6 @@
 from sqlalchemy import (
     Column,
     DateTime,
-    Float,
     Integer,
     String
 )
@@ -10,8 +9,8 @@ from sqlalchemy.sql import func
 from app.database.database import Base
 
 
-class Product(Base):
-    __tablename__ = "products"
+class Category(Base):
+    __tablename__ = "categories"
 
     id = Column(
         Integer,
@@ -20,7 +19,7 @@ class Product(Base):
     )
 
     name = Column(
-        String(150),
+        String(100),
         nullable=False,
         unique=True,
         index=True
@@ -28,29 +27,7 @@ class Product(Base):
 
     description = Column(
         String(500),
-        nullable=False
-    )
-
-    category = Column(
-        String(100),
-        nullable=False,
-        index=True
-    )
-
-    image_url = Column(
-        String(1000),
         nullable=True
-    )
-
-    price = Column(
-        Float,
-        nullable=False
-    )
-
-    stock = Column(
-        Integer,
-        nullable=False,
-        default=0
     )
 
     created_at = Column(

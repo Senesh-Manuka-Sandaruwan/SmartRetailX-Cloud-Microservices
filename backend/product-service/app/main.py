@@ -1,58 +1,33 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database.database import Base, engine
+
 from app.models.product import Product
+from app.models.category import Category
+
 from app.routers.product_router import router as product_router
+from app.routers.category_router import router as category_router
+
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+
 app = FastAPI(
     title="SmartRetailX Product Service",
-    description="Product Management Microservice",
+    description=(
+        "Product and Category Management "
+        "Microservice"
+    ),
     version="1.0.0"
 )
 
-# Register Product Router
-app.include_router(product_router)
-
 
 # ==========================================
-# ROOT ENDPOINT
+# CORS CONFIGURATION
 # ==========================================
-@app.get("/")
-def root():
-    return {
-        "service": "Product Service",
-        "status": "Running",
-        "version": "1.0.0"
-    }
-
-
-# ==========================================
-# HEALTH CHECK
-# ==========================================
-@app.get("/health")
-def health():
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-
-        return {
-            "status": "Healthy",
-            "database": "Connected"
-        }
-
-    except Exception as e:
-        return {
-            "status": "Unhealthy",
-            "database": "Disconnected",
-            "error": str(e)
-        }
-
-from fastapi.middleware.cors import CORSMiddleware
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -63,3 +38,59 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+
+# ==========================================
+# REGISTER ROUTERS
+# ==========================================
+app.include_router(product_router)
+app.include_router(category_router)
+
+
+# ==========================================
+# ROOT ENDPOINT
+# ==========================================
+@app.get(
+    "/",
+    tags=["Root"]
+)
+def root():
+    return {
+        "service": "Product Service",
+        "status": "Running",
+        "version": "1.0.0",
+        "features": [
+            "Product Management",
+            "Category Management",
+            "Product Image URLs"
+        ]
+    }
+
+
+# ==========================================
+# HEALTH CHECK
+# ==========================================
+@app.get(
+    "/health",
+    tags=["Health"]
+)
+def health():
+    try:
+        with engine.connect() as connection:
+            connection.execute(
+                text("SELECT 1")
+            )
+
+        return {
+            "status": "Healthy",
+            "database": "Connected",
+            "service": "product-service"
+        }
+
+    except Exception as error:
+        return {
+            "status": "Unhealthy",
+            "database": "Disconnected",
+            "service": "product-service",
+            "error": str(error)
+        }

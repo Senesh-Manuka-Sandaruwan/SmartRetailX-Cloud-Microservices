@@ -517,21 +517,59 @@ const PublicProductDetails = () => {
                                     : `${product.stock} unit(s) available`}
                             </span>
 
-                            <div className="public-product-details-icon">
-                                {getCategoryIcon(
-                                    product.category
+                            <div className="public-product-details-image-wrapper">
+                                {product.image_url ? (
+                                    <>
+                                        <img
+                                            className="public-product-details-image"
+                                            src={product.image_url}
+                                            alt={product.name}
+                                            loading="lazy"
+                                            onError={(event) => {
+                                                event.currentTarget.style.display =
+                                                    "none";
+
+                                                const fallback =
+                                                    event.currentTarget
+                                                        .nextElementSibling;
+
+                                                if (fallback) {
+                                                    fallback.style.display =
+                                                        "grid";
+                                                }
+                                            }}
+                                        />
+
+                                        <div
+                                            className="public-product-details-icon"
+                                            style={{ display: "none" }}
+                                        >
+                                            {getCategoryIcon(
+                                                product.category
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="public-product-details-icon">
+                                        {getCategoryIcon(
+                                            product.category
+                                        )}
+                                    </div>
                                 )}
                             </div>
 
                             <div className="public-product-details-visual-caption">
                                 <small>
-                                    SmartRetailX collection
+                                    SmartRetailX Collection
                                 </small>
 
                                 <strong>
-                                    {product.category ||
-                                        "General product"}
+                                    {product.name}
                                 </strong>
+
+                                <p>
+                                    {product.category}
+                                </p>
                             </div>
                         </div>
 
@@ -654,9 +692,9 @@ const PublicProductDetails = () => {
                                             disabled={
                                                 isOutOfStock ||
                                                 quantity >=
-                                                    Number(
-                                                        product.stock
-                                                    )
+                                                Number(
+                                                    product.stock
+                                                )
                                             }
                                         >
                                             +
@@ -880,11 +918,24 @@ const PublicProductDetails = () => {
                                             }
                                         >
                                             <div className="public-related-product-visual">
-                                                <span>
-                                                    {getCategoryIcon(
-                                                        relatedProduct.category
-                                                    )}
-                                                </span>
+
+                                                {relatedProduct.image_url ? (
+                                                    <img
+                                                        src={relatedProduct.image_url}
+                                                        alt={relatedProduct.name}
+                                                        className="public-related-product-image"
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            event.currentTarget.style.display = "none";
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span>
+                                                        {getCategoryIcon(
+                                                            relatedProduct.category
+                                                        )}
+                                                    </span>
+                                                )}
 
                                                 <b
                                                     className={
@@ -901,6 +952,7 @@ const PublicProductDetails = () => {
                                                         ? "In stock"
                                                         : "Out of stock"}
                                                 </b>
+
                                             </div>
 
                                             <div className="public-related-product-body">

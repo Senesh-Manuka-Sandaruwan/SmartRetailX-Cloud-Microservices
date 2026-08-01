@@ -710,11 +710,24 @@ const PublicProducts = () => {
                                                     "Uncategorized"}
                                             </span>
 
-                                            <div className="public-product-icon">
-                                                {getCategoryIcon(
-                                                    product.category
-                                                )}
-                                            </div>
+                                            {product.image_url ? (
+                                                <img
+                                                    className="public-product-image"
+                                                    src={product.image_url}
+                                                    alt={product.name}
+                                                    loading="lazy"
+                                                    onError={(event) => {
+                                                        event.currentTarget.style.display =
+                                                            "none";
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="public-product-icon">
+                                                    {getCategoryIcon(
+                                                        product.category
+                                                    )}
+                                                </div>
+                                            )}
 
                                             <span
                                                 className={

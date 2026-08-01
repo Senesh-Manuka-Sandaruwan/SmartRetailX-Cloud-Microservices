@@ -25,56 +25,11 @@ import Cart from "../pages/public/Cart";
 import Checkout from "../pages/public/Checkout";
 import PublicProducts from "../pages/public/PublicProducts";
 import PublicProductDetails from "../pages/public/PublicProductDetails";
-
-
-const AdminDashboardPlaceholder = () => {
-    const {
-        user,
-        logout
-    } = useAuth();
-
-    return (
-        <main className="temporary-dashboard-page admin-placeholder-page">
-            <section className="temporary-dashboard-card admin-placeholder-card">
-                <div className="temporary-dashboard-icon admin-dashboard-icon">
-                    ⚙️
-                </div>
-
-                <span className="welcome-chip">
-                    Administrator area
-                </span>
-
-                <h1>
-                    SmartRetailX Admin Dashboard
-                </h1>
-
-                <p>
-                    Signed in as{" "}
-                    <strong>
-                        {user?.sub ||
-                            user?.email ||
-                            "Administrator"}
-                    </strong>
-                </p>
-
-                <p className="temporary-dashboard-description">
-                    Product management, order administration,
-                    notifications and dashboard analytics will be
-                    added next.
-                </p>
-
-                <button
-                    className="primary-button"
-                    type="button"
-                    onClick={logout}
-                >
-                    Sign out
-                </button>
-            </section>
-        </main>
-    );
-};
-
+import AdminDashboard from "../pages/admin/AdminDashboard";
+import AdminProducts from "../pages/admin/AdminProducts";
+import AdminOrders from "../pages/admin/AdminOrders";
+import AdminUsers from "../pages/admin/AdminUsers";
+import AdminNotifications from "../pages/admin/AdminNotifications";
 
 const LoadingScreen = ({ message }) => {
     return (
@@ -281,7 +236,43 @@ const AppRoutes = () => {
                 path="/admin"
                 element={
                     <AdminRoute>
-                        <AdminDashboardPlaceholder />
+                        <AdminDashboard />
+                    </AdminRoute>
+                }
+            />
+
+            <Route
+                path="/admin/products"
+                element={
+                    <AdminRoute>
+                        <AdminProducts />
+                    </AdminRoute>
+                }
+            />
+
+            <Route
+                path="/admin/orders"
+                element={
+                    <AdminRoute>
+                        <AdminOrders />
+                    </AdminRoute>
+                }
+            />
+
+            <Route
+                path="/admin/users"
+                element={
+                    <AdminRoute>
+                        <AdminUsers />
+                    </AdminRoute>
+                }
+            />
+
+            <Route
+                path="/admin/notifications"
+                element={
+                    <AdminRoute>
+                        <AdminNotifications />
                     </AdminRoute>
                 }
             />
