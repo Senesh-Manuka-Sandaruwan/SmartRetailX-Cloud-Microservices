@@ -1,0 +1,32 @@
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm ci
+
+COPY . .
+
+ARG VITE_USER_SERVICE
+ARG VITE_PRODUCT_SERVICE
+ARG VITE_ORDER_SERVICE
+ARG VITE_NOTIFICATION_SERVICE
+
+ENV VITE_USER_SERVICE=$VITE_USER_SERVICE
+ENV VITE_PRODUCT_SERVICE=$VITE_PRODUCT_SERVICE
+ENV VITE_ORDER_SERVICE=$VITE_ORDER_SERVICE
+ENV VITE_NOTIFICATION_SERVICE=$VITE_NOTIFICATION_SERVICE
+
+RUN npm run build
+
+
+FROM nginx:1.27-alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

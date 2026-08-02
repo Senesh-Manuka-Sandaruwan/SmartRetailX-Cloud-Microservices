@@ -1,0 +1,167 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: smartretailx-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: smartretailx
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    networks:
+      - smartretailx-network
+
+
+  user-service:
+    build:
+      context: ./backend/user-service
+
+    container_name: smartretailx-user-service
+    restart: unless-stopped
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: smartretailx
+      SECRET_KEY: ReplaceThisWithALongRandomSecretKey
+      ALGORITHM: HS256
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      - mysql
+
+    networks:
+      - smartretailx-network
+
+
+  product-service:
+    build:
+      context: ./backend/product-service
+
+    container_name: smartretailx-product-service
+    restart: unless-stopped
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: smartretailx
+      SECRET_KEY: ReplaceThisWithALongRandomSecretKey
+      ALGORITHM: HS256
+      INTERNAL_SERVICE_KEY: SmartRetailX-Internal-Key-2026
+
+    ports:
+      - "8001:8001"
+
+    depends_on:
+      - mysql
+      - user-service
+
+    networks:
+      - smartretailx-network
+
+
+  notification-service:
+    build:
+      context: ./backend/notification-service
+
+    container_name: smartretailx-notification-service
+    restart: unless-stopped
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: smartretailx
+      SECRET_KEY: ReplaceThisWithALongRandomSecretKey
+      ALGORITHM: HS256
+      INTERNAL_SERVICE_KEY: SmartRetailX-Internal-Key-2026
+      USER_SERVICE_URL: http://user-service:8000
+
+    ports:
+      - "8003:8003"
+
+    depends_on:
+      - mysql
+      - user-service
+
+    networks:
+      - smartretailx-network
+
+
+  order-service:
+    build:
+      context: ./backend/order-service
+
+    container_name: smartretailx-order-service
+    restart: unless-stopped
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: smartretailx
+      SECRET_KEY: ReplaceThisWithALongRandomSecretKey
+      ALGORITHM: HS256
+      INTERNAL_SERVICE_KEY: SmartRetailX-Internal-Key-2026
+      PRODUCT_SERVICE_URL: http://product-service:8001
+      NOTIFICATION_SERVICE_URL: http://notification-service:8003
+
+    ports:
+      - "8002:8002"
+
+    depends_on:
+      - mysql
+      - product-service
+      - notification-service
+
+    networks:
+      - smartretailx-network
+
+
+  frontend:
+    build:
+      context: ./frontend
+
+      args:
+        VITE_USER_SERVICE: http://localhost:8000
+        VITE_PRODUCT_SERVICE: http://localhost:8001
+        VITE_ORDER_SERVICE: http://localhost:8002
+        VITE_NOTIFICATION_SERVICE: http://localhost:8003
+
+    container_name: smartretailx-frontend
+    restart: unless-stopped
+
+    ports:
+      - "5173:80"
+
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - notification-service
+
+    networks:
+      - smartretailx-network
+
+
+volumes:
+  mysql_data:
+
+
+networks:
+  smartretailx-network:
+    driver: bridge
