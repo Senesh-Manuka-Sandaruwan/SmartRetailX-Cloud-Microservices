@@ -703,9 +703,44 @@ const productCategories = useMemo(() => {
                                             {product.category}
                                         </span>
 
-                                        <div className="home-product-main-icon">
-                                            {getCategoryIcon(
-                                                product.category
+                                        <div className="home-product-image-wrapper">
+                                            {product.image_url ? (
+                                                <>
+                                                    <img
+                                                        className="home-product-image"
+                                                        src={product.image_url}
+                                                        alt={product.name}
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            event.currentTarget.style.display =
+                                                                "none";
+
+                                                            const fallback =
+                                                                event.currentTarget
+                                                                    .nextElementSibling;
+
+                                                            if (fallback) {
+                                                                fallback.style.display =
+                                                                    "grid";
+                                                            }
+                                                        }}
+                                                    />
+
+                                                    <div
+                                                        className="home-product-main-icon"
+                                                        style={{ display: "none" }}
+                                                    >
+                                                        {getCategoryIcon(
+                                                            product.category
+                                                        )}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="home-product-main-icon">
+                                                    {getCategoryIcon(
+                                                        product.category
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
 

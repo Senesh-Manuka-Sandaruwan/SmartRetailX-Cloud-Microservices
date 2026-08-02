@@ -147,6 +147,14 @@ const Products = () => {
                 <nav className="customer-sidebar-nav">
                     <Link
                         className="customer-nav-link"
+                        to="/"
+                    >
+                        <span>🏠</span>
+                        Store Home
+                    </Link>
+
+                    <Link
+                        className="customer-nav-link"
                         to="/customer"
                     >
                         <span>⌂</span>
@@ -354,10 +362,9 @@ const Products = () => {
                             <h2>
                                 {loading
                                     ? "Loading products"
-                                    : `${filteredProducts.length} product${
-                                        filteredProducts.length === 1
-                                            ? ""
-                                            : "s"
+                                    : `${filteredProducts.length} product${filteredProducts.length === 1
+                                        ? ""
+                                        : "s"
                                     } found`}
                             </h2>
                         </div>
@@ -413,10 +420,45 @@ const Products = () => {
                                     key={product.id}
                                 >
                                     <div className="products-card-visual">
-                                        <div className="products-category-icon">
-                                            {product.category
-                                                ?.charAt(0)
-                                                .toUpperCase() || "P"}
+                                        <div className="products-card-image-wrapper">
+                                            {product.image_url ? (
+                                                <>
+                                                    <img
+                                                        className="products-card-image"
+                                                        src={product.image_url}
+                                                        alt={product.name}
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            event.currentTarget.style.display =
+                                                                "none";
+
+                                                            const fallback =
+                                                                event.currentTarget
+                                                                    .nextElementSibling;
+
+                                                            if (fallback) {
+                                                                fallback.style.display =
+                                                                    "grid";
+                                                            }
+                                                        }}
+                                                    />
+
+                                                    <div
+                                                        className="products-category-icon"
+                                                        style={{ display: "none" }}
+                                                    >
+                                                        {product.category
+                                                            ?.charAt(0)
+                                                            .toUpperCase() || "P"}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="products-category-icon">
+                                                    {product.category
+                                                        ?.charAt(0)
+                                                        .toUpperCase() || "P"}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <span

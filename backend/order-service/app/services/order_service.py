@@ -29,19 +29,13 @@ PRODUCT_SERVICE_URL = os.getenv(
 
 INTERNAL_SERVICE_KEY = os.getenv(
     "INTERNAL_SERVICE_KEY",
-    ""
+    "SmartRetailX-Internal-Key-2026"
 )
 
 NOTIFICATION_SERVICE_URL = os.getenv(
     "NOTIFICATION_SERVICE_URL",
     "http://127.0.0.1:8003"
 ).rstrip("/")
-
-NOTIFICATION_SERVICE_TOKEN = os.getenv(
-    "NOTIFICATION_SERVICE_TOKEN",
-    ""
-)
-
 
 ALLOWED_ORDER_STATUSES = [
     "Pending",
@@ -327,18 +321,12 @@ def send_order_notification(
     message: str
 ) -> bool:
     """
-    Send a notification to the Notification Service.
+    Send a notification to the Notification Service using
+    the shared X-Service-Key.
 
     Notification failure does not cancel a successfully completed
     order operation. The function returns False when delivery fails.
     """
-
-    if not NOTIFICATION_SERVICE_TOKEN:
-        print(
-            "Notification skipped: "
-            "NOTIFICATION_SERVICE_TOKEN is missing"
-        )
-        return False
 
     notification_payload = {
         "customer_email": customer_email,
@@ -348,17 +336,22 @@ def send_order_notification(
         "message": message
     }
 
-    headers = build_authorization_headers(
-        NOTIFICATION_SERVICE_TOKEN
-    )
-
     try:
+        headers = build_service_headers()
+
         response = requests.post(
-            f"{NOTIFICATION_SERVICE_URL}/notifications/",
+            f"{NOTIFICATION_SERVICE_URL}/notifications/internal",
             json=notification_payload,
             headers=headers,
             timeout=10
         )
+
+    except HTTPException as error:
+        print(
+            "Notification skipped: "
+            f"{error.detail}"
+        )
+        return False
 
     except requests.RequestException as error:
         print(

@@ -574,6 +574,14 @@ const Notifications = () => {
                 <nav className="customer-sidebar-nav">
                     <Link
                         className="customer-nav-link"
+                        to="/"
+                    >
+                        <span>🏠</span>
+                        Store Home
+                    </Link>
+
+                    <Link
+                        className="customer-nav-link"
                         to="/customer"
                     >
                         <span>⌂</span>

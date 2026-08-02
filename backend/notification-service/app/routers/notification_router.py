@@ -1,14 +1,23 @@
-from typing import List
+import os
+from typing import List, Optional
+
+import requests
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 from fastapi import (
     APIRouter,
     Depends,
+    Header,
     HTTPException,
     Query
 )
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user
+from app.core.security import (
+    get_current_user,
+    verify_internal_service_key
+)
 from app.core.roles import require_admin
 from app.database.database import get_db
 
@@ -37,6 +46,47 @@ from app.services.notification_service import (
     paginate_customer_notifications,
     count_unread_customer_notifications
 )
+
+
+load_dotenv()
+
+
+USER_SERVICE_URL = os.getenv(
+    "USER_SERVICE_URL",
+    "http://127.0.0.1:8000"
+).rstrip("/")
+
+
+class AdminDirectNotificationRequest(BaseModel):
+    recipient_email: str = Field(
+        ...,
+        min_length=3
+    )
+    title: str = Field(
+        ...,
+        min_length=1
+    )
+    message: str = Field(
+        ...,
+        min_length=1
+    )
+    type: str = "GENERAL"
+    broadcast: bool = False
+
+
+class AdminBroadcastNotificationRequest(BaseModel):
+    title: str = Field(
+        ...,
+        min_length=1
+    )
+    message: str = Field(
+        ...,
+        min_length=1
+    )
+    type: str = "GENERAL"
+    broadcast: bool = True
+    recipient_email: Optional[str] = None
+    customer_emails: Optional[List[str]] = None
 
 
 router = APIRouter(
@@ -76,6 +126,89 @@ def extract_user_email(current_user) -> str:
     return email
 
 
+def normalize_notification_type(
+    notification_type: str
+) -> str:
+    """
+    Convert frontend notification labels into backend values.
+    """
+
+    cleaned_type = (
+        notification_type or "GENERAL"
+    ).strip().upper()
+
+    type_map = {
+    "GENERAL": "GENERAL",
+    "ORDER": "ORDER_CREATED",
+    "PROMOTION": "PROMOTION",
+    "SYSTEM": "SYSTEM",
+    "WARNING": "WARNING"
+    }
+
+    return type_map.get(
+        cleaned_type,
+        cleaned_type
+    )
+
+
+def get_customer_emails_from_user_service(
+    authorization: str
+) -> List[str]:
+    """
+    Retrieve all customer email addresses from the User Service.
+    """
+
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header is missing."
+        )
+
+    try:
+        response = requests.get(
+            f"{USER_SERVICE_URL}/users/admin/users",
+            headers={
+                "Authorization": authorization
+            },
+            timeout=10
+        )
+
+    except requests.RequestException as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unable to connect to User Service: {error}"
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text
+        )
+
+    users = response.json()
+
+    customer_emails = []
+
+    for user in users:
+
+        role = (
+            str(user.get("role", ""))
+            .strip()
+            .lower()
+        )
+
+        email = (
+            user.get("email")
+            or user.get("sub")
+            or user.get("username")
+        )
+
+        if role == "customer" and email:
+            customer_emails.append(email)
+
+    return customer_emails
+
+
 # ==========================================================
 # CREATE NOTIFICATION
 # ==========================================================
@@ -94,6 +227,33 @@ def add_notification(
 
     Admin access is required.
     Later, the Order Service can call this endpoint.
+    """
+
+    return create_notification(
+        db=db,
+        notification_data=notification
+    )
+
+
+# ==========================================================
+# INTERNAL SERVICE: CREATE NOTIFICATION
+# ==========================================================
+
+@router.post(
+    "/internal",
+    status_code=201
+)
+def add_internal_notification(
+    notification: NotificationCreate,
+    db: Session = Depends(get_db),
+    service_authenticated=Depends(
+        verify_internal_service_key
+    )
+):
+    """
+    Create a notification from a trusted internal service.
+
+    The Order Service must send the shared X-Service-Key header.
     """
 
     return create_notification(
@@ -350,6 +510,124 @@ def delete_my_notification(
         customer_email=customer_email,
         is_admin=False
     )
+
+
+# ==========================================================
+# ADMIN: SEND DIRECT NOTIFICATION
+# ==========================================================
+
+@router.post(
+    "/admin/send",
+    status_code=201
+)
+def send_admin_notification(
+    request_data: AdminDirectNotificationRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin)
+):
+    """
+    Send one notification to one customer.
+    """
+
+    customer_email = (
+        request_data.recipient_email
+        .strip()
+        .lower()
+    )
+
+    notification_data = NotificationCreate(
+        customer_email=customer_email,
+        order_id=None,
+        notification_type=normalize_notification_type(
+            request_data.type
+        ),
+        title=request_data.title.strip(),
+        message=request_data.message.strip()
+    )
+
+    return create_notification(
+        db=db,
+        notification_data=notification_data
+    )
+
+
+# ==========================================================
+# ADMIN: BROADCAST NOTIFICATION
+# ==========================================================
+
+@router.post(
+    "/admin/broadcast",
+    status_code=201
+)
+def broadcast_admin_notification(
+    request_data: AdminBroadcastNotificationRequest,
+    authorization: str = Header(
+        default="",
+        alias="Authorization"
+    ),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin)
+):
+    """
+    Send the same notification to every customer.
+
+    Customer emails can be supplied in the request. When they are
+    not supplied, they are retrieved from the User Service.
+    """
+
+    supplied_emails = (
+        request_data.customer_emails
+        or []
+    )
+
+    if supplied_emails:
+        customer_emails = sorted({
+            email.strip().lower()
+            for email in supplied_emails
+            if email and email.strip()
+        })
+    else:
+        customer_emails = (
+            get_customer_emails_from_user_service(
+                authorization
+            )
+        )
+
+    if not customer_emails:
+        raise HTTPException(
+            status_code=400,
+            detail="No customer accounts were found for the broadcast"
+        )
+
+    created_notifications = []
+
+    for customer_email in customer_emails:
+        notification_data = NotificationCreate(
+            customer_email=customer_email,
+            order_id=None,
+            notification_type=normalize_notification_type(
+                request_data.type
+            ),
+            title=request_data.title.strip(),
+            message=request_data.message.strip()
+        )
+
+        result = create_notification(
+            db=db,
+            notification_data=notification_data
+        )
+
+        created_notifications.append(
+            result["notification"]
+        )
+
+    return {
+        "message": "Broadcast notification sent successfully",
+        "created_count": len(
+            created_notifications
+        ),
+        "notifications": created_notifications
+    }
 
 
 # ==========================================================

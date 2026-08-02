@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # ==========================================================
 
 ALLOWED_NOTIFICATION_TYPES = [
+    "GENERAL",
+    "PROMOTION",
+    "SYSTEM",
+    "WARNING",
     "ORDER_CREATED",
     "ORDER_CONFIRMED",
     "ORDER_PROCESSING",

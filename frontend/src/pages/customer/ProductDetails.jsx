@@ -199,6 +199,14 @@ const ProductDetails = () => {
                 <nav className="customer-sidebar-nav">
                     <Link
                         className="customer-nav-link"
+                        to="/"
+                    >
+                        <span>🏠</span>
+                        Store Home
+                    </Link>
+
+                    <Link
+                        className="customer-nav-link"
                         to="/customer"
                     >
                         <span>⌂</span>
@@ -320,10 +328,45 @@ const ProductDetails = () => {
                                         : "Out of stock"}
                                 </span>
 
-                                <div className="product-details-letter">
-                                    {product.category
-                                        ?.charAt(0)
-                                        .toUpperCase() || "P"}
+                                <div className="product-details-image-wrapper">
+                                    {product.image_url ? (
+                                        <>
+                                            <img
+                                                className="product-details-image"
+                                                src={product.image_url}
+                                                alt={product.name}
+                                                loading="lazy"
+                                                onError={(event) => {
+                                                    event.currentTarget.style.display =
+                                                        "none";
+
+                                                    const fallback =
+                                                        event.currentTarget
+                                                            .nextElementSibling;
+
+                                                    if (fallback) {
+                                                        fallback.style.display =
+                                                            "grid";
+                                                    }
+                                                }}
+                                            />
+
+                                            <div
+                                                className="product-details-letter"
+                                                style={{ display: "none" }}
+                                            >
+                                                {product.category
+                                                    ?.charAt(0)
+                                                    .toUpperCase() || "P"}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="product-details-letter">
+                                            {product.category
+                                                ?.charAt(0)
+                                                .toUpperCase() || "P"}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="product-details-visual-caption">
@@ -422,7 +465,7 @@ const ProductDetails = () => {
                                                 onClick={increaseQuantity}
                                                 disabled={
                                                     quantity >=
-                                                        product.stock ||
+                                                    product.stock ||
                                                     product.stock <= 0
                                                 }
                                             >

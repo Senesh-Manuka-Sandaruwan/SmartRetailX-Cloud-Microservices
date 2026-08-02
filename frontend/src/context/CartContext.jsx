@@ -114,6 +114,18 @@ export const CartProvider = ({ children }) => {
                         item.id === product.id
                             ? {
                                   ...item,
+                                  name:
+                                      product.name,
+                                  description:
+                                      product.description ||
+                                      "",
+                                  category:
+                                      product.category ||
+                                      item.category,
+                                  image_url:
+                                      product.image_url ||
+                                      item.image_url ||
+                                      "",
                                   quantity:
                                       updatedQuantity,
                                   stock:
@@ -156,6 +168,8 @@ export const CartProvider = ({ children }) => {
                     category:
                         product.category ||
                         "Uncategorized",
+                    image_url:
+                        product.image_url || "",
                     price:
                         Number(
                             product.price
@@ -334,6 +348,10 @@ export const CartProvider = ({ children }) => {
                         category:
                             updatedProduct.category ||
                             item.category,
+                        image_url:
+                            updatedProduct.image_url ||
+                            item.image_url ||
+                            "",
                         price:
                             Number(
                                 updatedProduct.price

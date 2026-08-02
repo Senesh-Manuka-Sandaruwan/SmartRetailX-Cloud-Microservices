@@ -307,12 +307,48 @@ const Cart = () => {
                                                 key={item.id}
                                             >
                                                 <div className="cart-item-visual">
-                                                    <span>
-                                                        {item.category
-                                                            ?.charAt(0)
-                                                            .toUpperCase() ||
-                                                            "P"}
-                                                    </span>
+                                                    <div className="cart-item-image-wrapper">
+                                                        {item.image_url ? (
+                                                            <>
+                                                                <img
+                                                                    className="cart-item-image"
+                                                                    src={item.image_url}
+                                                                    alt={item.name}
+                                                                    loading="lazy"
+                                                                    onError={(event) => {
+                                                                        event.currentTarget.style.display =
+                                                                            "none";
+
+                                                                        const fallback =
+                                                                            event.currentTarget
+                                                                                .nextElementSibling;
+
+                                                                        if (fallback) {
+                                                                            fallback.style.display =
+                                                                                "grid";
+                                                                        }
+                                                                    }}
+                                                                />
+
+                                                                <span
+                                                                    className="cart-item-image-fallback"
+                                                                    style={{ display: "none" }}
+                                                                >
+                                                                    {item.category
+                                                                        ?.charAt(0)
+                                                                        .toUpperCase() ||
+                                                                        "P"}
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="cart-item-image-fallback">
+                                                                {item.category
+                                                                    ?.charAt(0)
+                                                                    .toUpperCase() ||
+                                                                    "P"}
+                                                            </span>
+                                                        )}
+                                                    </div>
 
                                                     <small>
                                                         {item.category}

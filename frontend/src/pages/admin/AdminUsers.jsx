@@ -543,6 +543,14 @@ const AdminUsers = () => {
 
                 <nav className="admin-sidebar-nav">
                     <Link
+                        className="customer-nav-link"
+                        to="/"
+                    >
+                        <span>🏠</span>
+                        Store Home
+                    </Link>
+
+                    <Link
                         className="admin-nav-link"
                         to="/admin"
                     >

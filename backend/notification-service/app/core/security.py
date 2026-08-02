@@ -1,7 +1,12 @@
 import os
 
 from dotenv import load_dotenv
-from fastapi import Depends, HTTPException, status
+from fastapi import (
+    Depends,
+    Header,
+    HTTPException,
+    status
+)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
@@ -9,23 +14,50 @@ from jose import JWTError, jwt
 load_dotenv()
 
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "ReplaceThisWithALongRandomSecretKey"
+)
+
+ALGORITHM = os.getenv(
+    "ALGORITHM",
+    "HS256"
+)
+
+INTERNAL_SERVICE_KEY = os.getenv(
+    "INTERNAL_SERVICE_KEY",
+    ""
+)
 
 
-if not SECRET_KEY:
-    raise RuntimeError(
-        "SECRET_KEY is missing from the Notification Service .env file"
+bearer_scheme = HTTPBearer(
+    auto_error=False
+)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(
+        bearer_scheme
     )
-
-
-security_scheme = HTTPBearer()
-
-
-def verify_token(token: str) -> dict:
+):
     """
-    Decode and validate a JWT created by the User Service.
+    Decode and validate a user JWT.
     """
+
+    if (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or not credentials.credentials
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={
+                "WWW-Authenticate": "Bearer"
+            }
+        )
+
+    token = credentials.credentials
 
     try:
         payload = jwt.decode(
@@ -33,44 +65,62 @@ def verify_token(token: str) -> dict:
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-
-        email = (
-            payload.get("email")
-            or payload.get("sub")
-            or payload.get("username")
-        )
-
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: user identity is missing",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-
-        return payload
-
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired authentication token",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Invalid or expired token",
+            headers={
+                "WWW-Authenticate": "Bearer"
+            }
         )
 
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(
-        security_scheme
+    email = (
+        payload.get("sub")
+        or payload.get("email")
+        or payload.get("username")
     )
-) -> dict:
-    """
-    Extract the bearer token and return its decoded JWT payload.
-    """
 
-    if not credentials or credentials.scheme.lower() != "bearer":
+    role = payload.get("role")
+
+    if not email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer authentication is required",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Token does not contain a user identity"
         )
 
-    return verify_token(credentials.credentials)
+    return {
+        **payload,
+        "sub": email,
+        "role": role
+    }
+
+
+def verify_internal_service_key(
+    x_service_key: str = Header(
+        default="",
+        alias="X-Service-Key"
+    )
+):
+    """
+    Validate trusted service-to-service requests.
+    """
+
+    if not INTERNAL_SERVICE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_SERVICE_KEY is not configured"
+        )
+
+    if not x_service_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="X-Service-Key header is required"
+        )
+
+    if x_service_key != INTERNAL_SERVICE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal service key"
+        )
+
+    return True

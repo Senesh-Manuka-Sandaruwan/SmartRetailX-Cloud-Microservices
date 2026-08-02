@@ -833,10 +833,46 @@ const Checkout = () => {
                                         key={item.id}
                                     >
                                         <div className="checkout-item-icon">
-                                            {item.category
-                                                ?.charAt(0)
-                                                .toUpperCase() ||
-                                                "P"}
+                                            {item.image_url ? (
+                                                <>
+                                                    <img
+                                                        className="checkout-item-image"
+                                                        src={item.image_url}
+                                                        alt={item.name}
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            event.currentTarget.style.display =
+                                                                "none";
+
+                                                            const fallback =
+                                                                event.currentTarget
+                                                                    .nextElementSibling;
+
+                                                            if (fallback) {
+                                                                fallback.style.display =
+                                                                    "grid";
+                                                            }
+                                                        }}
+                                                    />
+
+                                                    <span
+                                                        className="checkout-item-image-fallback"
+                                                        style={{ display: "none" }}
+                                                    >
+                                                        {item.category
+                                                            ?.charAt(0)
+                                                            .toUpperCase() ||
+                                                            "P"}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="checkout-item-image-fallback">
+                                                    {item.category
+                                                        ?.charAt(0)
+                                                        .toUpperCase() ||
+                                                        "P"}
+                                                </span>
+                                            )}
                                         </div>
 
                                         <div className="checkout-item-details">

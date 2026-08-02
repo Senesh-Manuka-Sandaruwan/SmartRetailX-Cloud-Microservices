@@ -116,6 +116,14 @@ const CustomerDashboard = () => {
 
                 <nav className="customer-sidebar-nav">
                     <Link
+                        className="customer-nav-link"
+                        to="/"
+                    >
+                        <span>🏠</span>
+                        Store Home
+                    </Link>
+
+                    <Link
                         className="customer-nav-link active"
                         to="/customer"
                     >
@@ -378,11 +386,46 @@ const CustomerDashboard = () => {
                                     key={product.id}
                                 >
                                     <div className="customer-product-visual">
-                                        <span>
-                                            {product.category
-                                                ?.charAt(0)
-                                                .toUpperCase() || "P"}
-                                        </span>
+                                        <div className="customer-product-image-wrapper">
+                                            {product.image_url ? (
+                                                <>
+                                                    <img
+                                                        className="customer-product-image"
+                                                        src={product.image_url}
+                                                        alt={product.name}
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            event.currentTarget.style.display =
+                                                                "none";
+
+                                                            const fallback =
+                                                                event.currentTarget
+                                                                    .nextElementSibling;
+
+                                                            if (fallback) {
+                                                                fallback.style.display =
+                                                                    "grid";
+                                                            }
+                                                        }}
+                                                    />
+
+                                                    <span
+                                                        className="customer-product-image-fallback"
+                                                        style={{ display: "none" }}
+                                                    >
+                                                        {product.category
+                                                            ?.charAt(0)
+                                                            .toUpperCase() || "P"}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="customer-product-image-fallback">
+                                                    {product.category
+                                                        ?.charAt(0)
+                                                        .toUpperCase() || "P"}
+                                                </span>
+                                            )}
+                                        </div>
 
                                         <div className="customer-stock-badge">
                                             {product.stock > 0

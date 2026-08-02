@@ -919,23 +919,46 @@ const PublicProductDetails = () => {
                                         >
                                             <div className="public-related-product-visual">
 
-                                                {relatedProduct.image_url ? (
-                                                    <img
-                                                        src={relatedProduct.image_url}
-                                                        alt={relatedProduct.name}
-                                                        className="public-related-product-image"
-                                                        loading="lazy"
-                                                        onError={(event) => {
-                                                            event.currentTarget.style.display = "none";
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <span>
-                                                        {getCategoryIcon(
-                                                            relatedProduct.category
-                                                        )}
-                                                    </span>
-                                                )}
+                                                <div className="public-related-product-image-wrapper">
+                                                    {relatedProduct.image_url ? (
+                                                        <>
+                                                            <img
+                                                                src={relatedProduct.image_url}
+                                                                alt={relatedProduct.name}
+                                                                className="public-related-product-image"
+                                                                loading="lazy"
+                                                                onError={(event) => {
+                                                                    event.currentTarget.style.display =
+                                                                        "none";
+
+                                                                    const fallback =
+                                                                        event.currentTarget
+                                                                            .nextElementSibling;
+
+                                                                    if (fallback) {
+                                                                        fallback.style.display =
+                                                                            "grid";
+                                                                    }
+                                                                }}
+                                                            />
+
+                                                            <span
+                                                                className="public-related-product-fallback"
+                                                                style={{ display: "none" }}
+                                                            >
+                                                                {getCategoryIcon(
+                                                                    relatedProduct.category
+                                                                )}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="public-related-product-fallback">
+                                                            {getCategoryIcon(
+                                                                relatedProduct.category
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </div>
 
                                                 <b
                                                     className={

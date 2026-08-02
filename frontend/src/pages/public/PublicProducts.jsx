@@ -710,24 +710,46 @@ const PublicProducts = () => {
                                                     "Uncategorized"}
                                             </span>
 
-                                            {product.image_url ? (
-                                                <img
-                                                    className="public-product-image"
-                                                    src={product.image_url}
-                                                    alt={product.name}
-                                                    loading="lazy"
-                                                    onError={(event) => {
-                                                        event.currentTarget.style.display =
-                                                            "none";
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="public-product-icon">
-                                                    {getCategoryIcon(
-                                                        product.category
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div className="public-product-image-wrapper">
+                                                {product.image_url ? (
+                                                    <>
+                                                        <img
+                                                            className="public-product-image"
+                                                            src={product.image_url}
+                                                            alt={product.name}
+                                                            loading="lazy"
+                                                            onError={(event) => {
+                                                                event.currentTarget.style.display =
+                                                                    "none";
+
+                                                                const fallback =
+                                                                    event.currentTarget
+                                                                        .nextElementSibling;
+
+                                                                if (fallback) {
+                                                                    fallback.style.display =
+                                                                        "grid";
+                                                                }
+                                                            }}
+                                                        />
+
+                                                        <div
+                                                            className="public-product-icon"
+                                                            style={{ display: "none" }}
+                                                        >
+                                                            {getCategoryIcon(
+                                                                product.category
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="public-product-icon">
+                                                        {getCategoryIcon(
+                                                            product.category
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
 
                                             <span
                                                 className={

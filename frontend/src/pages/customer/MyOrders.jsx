@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { orderAPI } from "../../api/axiosConfig";
+import { orderAPI, productAPI } from "../../api/axiosConfig";
 import { useAuth } from "../../context/AuthContext";
 
 
@@ -47,10 +47,48 @@ const MyOrders = () => {
                 "/my-orders"
             );
 
-            setOrders(
+            const orderRecords =
                 Array.isArray(response.data)
                     ? response.data
-                    : []
+                    : [];
+
+            const productIds = [
+                ...new Set(
+                    orderRecords
+                        .map((order) => order.product_id)
+                        .filter(Boolean)
+                )
+            ];
+
+            const productResults =
+                await Promise.allSettled(
+                    productIds.map((productId) =>
+                        productAPI.get(`/${productId}`)
+                    )
+                );
+
+            const productImageMap = new Map();
+
+            productResults.forEach((result) => {
+                if (
+                    result.status === "fulfilled" &&
+                    result.value?.data?.id
+                ) {
+                    productImageMap.set(
+                        result.value.data.id,
+                        result.value.data.image_url || ""
+                    );
+                }
+            });
+
+            setOrders(
+                orderRecords.map((order) => ({
+                    ...order,
+                    image_url:
+                        order.image_url ||
+                        productImageMap.get(order.product_id) ||
+                        ""
+                }))
             );
         } catch (requestError) {
             const detail =
@@ -228,6 +266,14 @@ const MyOrders = () => {
                 </div>
 
                 <nav className="customer-sidebar-nav">
+                    <Link
+                        className="customer-nav-link"
+                        to="/"
+                    >
+                        <span>🏠</span>
+                        Store Home
+                    </Link>
+
                     <Link
                         className="customer-nav-link"
                         to="/customer"
@@ -522,10 +568,9 @@ const MyOrders = () => {
                             <h2>
                                 {loading
                                     ? "Loading orders"
-                                    : `${filteredOrders.length} order${
-                                        filteredOrders.length === 1
-                                            ? ""
-                                            : "s"
+                                    : `${filteredOrders.length} order${filteredOrders.length === 1
+                                        ? ""
+                                        : "s"
                                     } found`}
                             </h2>
                         </div>
@@ -606,10 +651,44 @@ const MyOrders = () => {
 
                                         <div className="my-order-product">
                                             <div className="my-order-product-icon">
-                                                {order.product_name
-                                                    ?.charAt(0)
-                                                    .toUpperCase() ||
-                                                    "P"}
+                                                {order.image_url ? (
+                                                    <>
+                                                        <img
+                                                            className="my-order-product-image"
+                                                            src={order.image_url}
+                                                            alt={order.product_name}
+                                                            loading="lazy"
+                                                            onError={(event) => {
+                                                                event.currentTarget.style.display =
+                                                                    "none";
+
+                                                                const fallback =
+                                                                    event.currentTarget
+                                                                        .nextElementSibling;
+
+                                                                if (fallback) {
+                                                                    fallback.style.display =
+                                                                        "grid";
+                                                                }
+                                                            }}
+                                                        />
+
+                                                        <span
+                                                            className="my-order-product-image-fallback"
+                                                            style={{ display: "none" }}
+                                                        >
+                                                            {order.product_name
+                                                                ?.charAt(0)
+                                                                .toUpperCase() || "P"}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <span className="my-order-product-image-fallback">
+                                                        {order.product_name
+                                                            ?.charAt(0)
+                                                            .toUpperCase() || "P"}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             <div>
@@ -706,9 +785,9 @@ const MyOrders = () => {
 
                                                         const completed =
                                                             order.status !==
-                                                                "Cancelled" &&
+                                                            "Cancelled" &&
                                                             index <=
-                                                                currentIndex;
+                                                            currentIndex;
 
                                                         return (
                                                             <div
@@ -723,7 +802,7 @@ const MyOrders = () => {
                                                                     {completed
                                                                         ? "✓"
                                                                         : index +
-                                                                          1}
+                                                                        1}
                                                                 </span>
 
                                                                 <small>
@@ -737,11 +816,11 @@ const MyOrders = () => {
 
                                             {order.status ===
                                                 "Cancelled" && (
-                                                <p className="my-order-cancelled-note">
-                                                    This order has been
-                                                    cancelled.
-                                                </p>
-                                            )}
+                                                    <p className="my-order-cancelled-note">
+                                                        This order has been
+                                                        cancelled.
+                                                    </p>
+                                                )}
                                         </div>
 
                                         <div className="my-order-card-footer">
@@ -770,18 +849,18 @@ const MyOrders = () => {
                                                 disabled={
                                                     !canCancel ||
                                                     cancellingOrderId ===
-                                                        order.id
+                                                    order.id
                                                 }
                                             >
                                                 {cancellingOrderId ===
-                                                order.id
+                                                    order.id
                                                     ? "Cancelling..."
                                                     : canCancel
-                                                      ? "Cancel order"
-                                                      : order.status ===
-                                                          "Delivered"
-                                                        ? "Delivered"
-                                                        : "Cancelled"}
+                                                        ? "Cancel order"
+                                                        : order.status ===
+                                                            "Delivered"
+                                                            ? "Delivered"
+                                                            : "Cancelled"}
                                             </button>
                                         </div>
                                     </article>
