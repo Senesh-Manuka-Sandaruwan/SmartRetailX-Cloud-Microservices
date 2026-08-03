@@ -1,7 +1,8 @@
 import {
     Navigate,
     Route,
-    Routes
+    Routes,
+    useLocation
 } from "react-router-dom";
 
 import AdminRoute from "../components/AdminRoute";
@@ -53,6 +54,8 @@ const LoadingScreen = ({ message }) => {
 
 
 const PublicOnlyRoute = ({ children }) => {
+    const location = useLocation();
+
     const {
         loading,
         isAuthenticated,
@@ -66,6 +69,22 @@ const PublicOnlyRoute = ({ children }) => {
     }
 
     if (isAuthenticated) {
+        const requestedDestination =
+            location.state?.from;
+
+        if (
+            !isAdmin &&
+            requestedDestination &&
+            requestedDestination.startsWith("/checkout")
+        ) {
+            return (
+                <Navigate
+                    to={requestedDestination}
+                    replace
+                />
+            );
+        }
+
         return (
             <Navigate
                 to={isAdmin ? "/admin" : "/customer"}
