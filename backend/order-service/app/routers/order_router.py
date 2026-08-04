@@ -277,9 +277,9 @@ def filter_order_records_by_status(
     """
 
     return filter_orders_by_status(
-        db=db,
-        status=status
-    )
+    db=db,
+    order_status=status
+)
 
 
 # =========================================================
