@@ -137,10 +137,10 @@ services:
       context: ./frontend
 
       args:
-        VITE_USER_SERVICE: http://localhost:8000
-        VITE_PRODUCT_SERVICE: http://localhost:8001
-        VITE_ORDER_SERVICE: http://localhost:8002
-        VITE_NOTIFICATION_SERVICE: http://localhost:8003
+        VITE_USER_SERVICE: "http://smartretailx-alb-1121427889.ap-south-1.elb.amazonaws.com"
+        VITE_PRODUCT_SERVICE: "http://smartretailx-alb-1121427889.ap-south-1.elb.amazonaws.com"
+        VITE_ORDER_SERVICE: "http://smartretailx-alb-1121427889.ap-south-1.elb.amazonaws.com"
+        VITE_NOTIFICATION_SERVICE: "http://smartretailx-alb-1121427889.ap-south-1.elb.amazonaws.com"
 
     container_name: smartretailx-frontend
     restart: unless-stopped
