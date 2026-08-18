@@ -1,6 +1,8 @@
 import os
+import json
 from typing import Optional
 
+import boto3
 import requests
 from dotenv import load_dotenv
 from fastapi import HTTPException
@@ -36,6 +38,16 @@ NOTIFICATION_SERVICE_URL = os.getenv(
     "NOTIFICATION_SERVICE_URL",
     "http://127.0.0.1:8003"
 ).rstrip("/")
+
+SQS_QUEUE_URL = os.getenv(
+    "SQS_QUEUE_URL",
+    ""
+)
+
+AWS_REGION = os.getenv(
+    "AWS_REGION",
+    "ap-south-1"
+)
 
 ALLOWED_ORDER_STATUSES = [
     "Pending",
@@ -370,6 +382,60 @@ def send_order_notification(
 
     return True
 
+# ==========================================================
+# SQS EVENT PUBLISHING
+# ==========================================================
+
+def publish_order_created_event(order) -> bool:
+    """
+    Publish an OrderCreated event to Amazon SQS.
+
+    Failure to publish the event does not cancel an order
+    that has already been successfully created.
+    """
+
+    if not SQS_QUEUE_URL:
+        print("SQS event skipped: SQS_QUEUE_URL is not configured")
+        return False
+
+    event_payload = {
+        "event_type": "OrderCreated",
+        "order_id": order.id,
+        "customer_email": order.customer_email,
+        "product_id": order.product_id,
+        "product_name": order.product_name,
+        "quantity": order.quantity,
+        "total_price": float(order.total_price),
+        "status": order.status,
+        "source": "SmartRetailX-Order-Service"
+    }
+
+    try:
+        sqs = boto3.client(
+            "sqs",
+            region_name=AWS_REGION
+        )
+
+        sqs.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps(event_payload)
+        )
+
+        print(
+            f"OrderCreated event published to SQS "
+            f"for order {order.id}"
+        )
+
+        return True
+
+    except Exception as error:
+        print(
+            "Failed to publish OrderCreated event to SQS: "
+            f"{str(error)}"
+        )
+
+        return False
+
 
 # ==========================================================
 # CREATE ORDER
@@ -470,11 +536,14 @@ def create_order(
         )
     )
 
+    event_published = publish_order_created_event(new_order)
+
     return {
-        "message": "Order created successfully",
-        "notification_created": notification_created,
-        "order": new_order
-    }
+    "message": "Order created successfully",
+    "notification_created": notification_created,
+    "event_published": event_published,
+    "order": new_order
+}
 
 
 # ==========================================================
